@@ -5,9 +5,12 @@ from typing import Literal, overload
 from nekomata.clients.providers.anthropic import AnthropicClient
 from nekomata.clients.providers.google import GoogleClient
 from nekomata.clients.providers.openai import OpenAIClient
+from nekomata.utils import get_logger
 
 Client = OpenAIClient | GoogleClient | AnthropicClient
 SUPPORTED_PROVIDERS = {'openai', 'google', 'anthropic'}
+
+logger = get_logger(__name__)
 
 
 @overload
@@ -68,6 +71,7 @@ def create_client(
         err_msg = f'Unsupport provider "{provider}". Must be one of {SUPPORTED_PROVIDERS}'
         raise ValueError(err_msg)
 
+    logger.debug(f"Creating LLM client for provider: '{provider}' (base_url: {base_url})")
     if provider == 'openai':
         return OpenAIClient(
             api_key=api_key,

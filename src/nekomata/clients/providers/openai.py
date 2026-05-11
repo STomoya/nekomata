@@ -13,8 +13,11 @@ from nekomata.clients.base import ClientABC
 from nekomata.clients.utils import create_failed_response, filter_none
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.types.openai import OpenAIChatCompletionCommonAttrs
+from nekomata.utils import get_logger
 
 ResponseFormatT = TypeVar('ResponseFormatT')
+
+logger = get_logger(__name__)
 
 
 class OpenAIClient(ClientABC):
@@ -237,10 +240,12 @@ class OpenAIClient(ClientABC):
         # Filter out empty parameters.
         openai_unsupported_kwargs = filter_none(extra_body) or None
 
+        logger.debug(f'Entering semaphore for model: {model}')
         try:
             # NOTE(stomoya): We explicitly pass all the arguments to these functions for type checkers to correctly
             #   resolve the overloads for `.create()`.
             async with self.semaphore:
+                logger.debug(f'Acquired semaphore for model: {model}')
                 if response_format is None:
                     response = await self._client.chat.completions.create(
                         model=model,
@@ -272,4 +277,5 @@ class OpenAIClient(ClientABC):
                     )
                     return self.convert_output(response=response)
         except Exception as e:
+            logger.exception('OpenAI API call failed')
             return create_failed_response(response=None, fail_reason=f'{e!s}')

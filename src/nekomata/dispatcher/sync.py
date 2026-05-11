@@ -152,6 +152,7 @@ class SyncLLMDispatcher:
                 raise RuntimeError('Dispatcher is not running. Call start() or use a context manager.')
             portal = self._portal
 
+        logger.debug(f"Sync submission to '{endpoint_name}' (model: {model})")
         return portal.start_task_soon(
             self._async_dispatcher.submit,
             endpoint_name,

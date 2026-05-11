@@ -11,8 +11,11 @@ from google.genai.types import GenerateContentResponse
 from nekomata.clients.base import ClientABC
 from nekomata.clients.utils import create_failed_response
 from nekomata.types.integrations import ChatCompletionResponse
+from nekomata.utils import get_logger
 
 ResponseFormatT = TypeVar('ResponseFormatT')
+
+logger = get_logger(__name__)
 
 
 class GoogleClient(ClientABC):
@@ -186,8 +189,10 @@ class GoogleClient(ClientABC):
             thinking_config=thinking_config,
         )
 
+        logger.debug(f'Entering semaphore for model: {model}')
         try:
             async with self.semaphore:
+                logger.debug(f'Acquired semaphore for model: {model}')
                 response = await self._client.aio.models.generate_content(
                     model=model,
                     contents=prompt,
@@ -195,4 +200,5 @@ class GoogleClient(ClientABC):
                 )
                 return self.convert_output(response=response)
         except Exception as e:
+            logger.exception('Google API call failed')
             return create_failed_response(response=None, fail_reason=f'{e!s}')
