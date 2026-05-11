@@ -18,8 +18,11 @@ from nekomata.clients.base import ClientABC
 from nekomata.clients.utils import create_failed_response
 from nekomata.types.anthropic import AnthropicMessagesCommonAttrs
 from nekomata.types.integrations import ChatCompletionResponse
+from nekomata.utils import get_logger
 
 ResponseFormatT = TypeVar('ResponseFormatT')
+
+logger = get_logger(__name__)
 
 
 class AnthropicClient(ClientABC):
@@ -230,8 +233,10 @@ class AnthropicClient(ClientABC):
 
         omit = Omit()
 
+        logger.debug(f'Entering semaphore for model: {model}')
         try:
             async with self.semaphore:
+                logger.debug(f'Acquired semaphore for model: {model}')
                 if response_format is None:
                     response = await self._client.messages.create(
                         max_tokens=max_output_tokens,
@@ -256,4 +261,5 @@ class AnthropicClient(ClientABC):
                     )
                     return self.convert_output(response)
         except Exception as e:
+            logger.exception('Anthropic API call failed')
             return create_failed_response(response=None, fail_reason=f'{e!s}')

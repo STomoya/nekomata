@@ -8,9 +8,12 @@ import anyio
 import httpx
 
 from nekomata.types.integrations import ChatCompletionResponse
+from nekomata.utils import get_logger
 
 ResponseT = TypeVar('ResponseT')
 ResponseFormatT = TypeVar('ResponseFormatT')
+
+logger = get_logger(__name__)
 
 
 class ClientABC(ABC):
@@ -70,6 +73,7 @@ class ClientABC(ABC):
 
     async def aclose(self) -> None:
         """Close the underlying HTTP client."""
+        logger.debug('Closing underlying HTTPX client.')
         await self._http_client.aclose()
 
     @abstractmethod

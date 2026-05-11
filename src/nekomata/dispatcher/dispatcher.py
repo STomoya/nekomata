@@ -67,14 +67,14 @@ class AsyncLLMDispatcher:
             provider=provider,
             base_url=base_url,
             api_key=api_key,
-            timeout=timeout,
             max_concurrent=max_concurrent,
             max_connections=max_connections,
             max_keepalive=max_keepalive,
             keepalive_expiry=keepalive_expiry,
+            timeout=timeout,
             ssl_verify=ssl_verify,
         )
-        logger.info(f'Registered async endpoint: {name}')
+        logger.info(f"Registered async endpoint: '{name}' (provider: {provider})")
 
     def _get_or_create_client(self, endpoint_name: str) -> Client:
         """Lazy-loads the LLM client on first use."""
@@ -82,6 +82,7 @@ class AsyncLLMDispatcher:
             return self._clients[endpoint_name]
 
         config = self._configs[endpoint_name]
+        logger.info(f"Instantiating new {config.provider} client for endpoint: '{endpoint_name}'")
 
         client = create_client(
             provider=config.provider,
@@ -160,6 +161,7 @@ class AsyncLLMDispatcher:
 
         client = self._get_or_create_client(endpoint_name)
 
+        logger.debug(f"Submitting request to endpoint '{endpoint_name}' using model '{model}'")
         try:
             response = await client.acompletion(
                 model=model,
@@ -177,13 +179,17 @@ class AsyncLLMDispatcher:
                 extra_body=extra_body,
             )
         except anyio.get_cancelled_exc_class():
-            logger.warning(f'Request to {endpoint_name} was cancelled.')
+            logger.warning(f"Request to '{endpoint_name}' was cancelled.")
             raise
         except (OpenAIError, AnthropicError, APIError):
-            logger.exception(f'Client package error on {endpoint_name}')
+            logger.exception(f"Client package error on '{endpoint_name}'")
             raise
         except Exception:
-            logger.exception(f'Unexpected error processing LLM request on {endpoint_name}')
+            logger.exception(f"Unexpected error processing LLM request on '{endpoint_name}'")
             raise
         else:
+            logger.debug(
+                f"Request to '{endpoint_name}' successful. "
+                f'Usage: {response.total_tokens if response.total_tokens else "N/A"} tokens'
+            )
             return response
