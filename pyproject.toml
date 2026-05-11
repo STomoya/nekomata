@@ -1,0 +1,101 @@
+[project]
+name = "nekomata"
+description = "LLM dispatcher."
+readme = "README.md"
+authors = [
+    { name = "Tomoya Sawada", email = "stomoya0110@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.100.0",
+    "anyio>=4.13.0",
+    "fastuuid>=0.14.0",
+    "google-genai>=1.75.0",
+    "httpx>=0.28.1",
+    "openai>=2.35.1",
+    "pydantic>=2.13.4",
+]
+dynamic = ["version"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/nekomata/version.py"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.15.1",
+]
+
+[tool.uv]
+default-groups = "all"
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+
+target-version = "py312"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403", "F405"]
+"*.pyi" = ["F401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint]
+select = [
+    "B",
+    "E",
+    "F",
+    "C4",
+    "SIM",
+    "W",
+    "NPY",
+    "PIE",
+    "PL",
+    "PYI",
+    "RUF",
+    "TRY",
+    "D",
+    "D401",
+    "D413",
+]
+ignore = [
+    "C408",    # dict() statement. I like dict().
+    "PLR0911", # Too many return.
+    "PLR0912", # Too many branches.
+    "PLR0913", # Too many args.
+    "TRY002",  # Create Exception class.
+    "TRY003",  # Long message outside exception class.
+    "NPY002",  # numpy.random.Generator. Most torch programs use np.random.seed().
+    "PLR0402", # import torch.nn as nn -> from torch import nn.
+    "SIM108",  # if: a=...; else: a=... -> a = ... if else ...;. I like using if-else in some cases.
+    "B905",    # assert ... in ... -> if ... not in ...: raise AssertionError(...). I like using assert in some cases.
+    "PYI021",  # docstring in .pyi.
+]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.pytest.ini_options]
+addopts = [
+    "-vv",
+    "-s",
+    "-ra",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=xml:reports/coverage.xml",
+    "--junitxml=reports/pytest.xml"
+]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+omit = []
+
+[tool.ty.terminal]
+output-format = "concise"
