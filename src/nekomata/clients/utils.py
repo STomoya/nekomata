@@ -8,9 +8,11 @@ from nekomata.types.integrations import ChatCompletionResponse, ChatCompletionSt
 def create_failed_response[ResponseT](
     response: ResponseT | None,
     fail_reason: str,
+    created_at: float,
 ) -> ChatCompletionResponse[None]:
     """Create a failed chat completion object."""
     return ChatCompletionResponse(
+        created_at=created_at,
         status=ChatCompletionStatus.FAILED,
         original=response,
         fail_reason=fail_reason,

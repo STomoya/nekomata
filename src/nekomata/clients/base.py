@@ -78,7 +78,7 @@ class ClientABC(ABC):
 
     @abstractmethod
     def convert_output(
-        self, response: ResponseT
+        self, response: ResponseT, created_at: float
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert raw response to a flatter response object."""
         raise NotImplementedError

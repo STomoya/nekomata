@@ -13,7 +13,7 @@ from nekomata.clients.base import ClientABC
 from nekomata.clients.utils import create_failed_response, filter_none
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.types.openai import OpenAIChatCompletionCommonAttrs
-from nekomata.utils import get_logger
+from nekomata.utils import get_logger, get_utc_timestamp
 
 ResponseFormatT = TypeVar('ResponseFormatT')
 
@@ -112,23 +112,24 @@ class OpenAIClient(ClientABC):
         )
         return common_attrs
 
-    def _convert_create_output(self, response: ChatCompletion) -> ChatCompletionResponse[None]:
+    def _convert_create_output(self, response: ChatCompletion, created_at: float) -> ChatCompletionResponse[None]:
         common_attrs = self._extract_common_attrs(response=response)
         converted_response = ChatCompletionResponse[None](
+            created_at=created_at,
             original=response,
             **common_attrs._asdict(),
         )
         return converted_response
 
     def _convert_parse_output(
-        self,
-        response: ParsedChatCompletion[ResponseFormatT],
+        self, response: ParsedChatCompletion[ResponseFormatT], created_at: float
     ) -> ChatCompletionResponse[ResponseFormatT]:
         common_attrs = self._extract_common_attrs(response=response)
 
         parsed = response.choices[0].message.parsed
 
         converted_response = ChatCompletionResponse[ResponseFormatT](
+            created_at=created_at,
             original=response,
             parsed=parsed,
             **common_attrs._asdict(),
@@ -136,21 +137,21 @@ class OpenAIClient(ClientABC):
         return converted_response
 
     @overload
-    def convert_output(self, response: ChatCompletion) -> ChatCompletionResponse[None]: ...
+    def convert_output(self, response: ChatCompletion, created_at: float) -> ChatCompletionResponse[None]: ...
 
     @overload
     def convert_output(
-        self, response: ParsedChatCompletion[ResponseFormatT]
+        self, response: ParsedChatCompletion[ResponseFormatT], created_at: float
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     def convert_output(
-        self, response: ChatCompletion | ParsedChatCompletion[ResponseFormatT]
+        self, response: ChatCompletion | ParsedChatCompletion[ResponseFormatT], created_at: float
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert output."""
         if isinstance(response, ParsedChatCompletion):
-            return self._convert_parse_output(response)
+            return self._convert_parse_output(response, created_at)
         else:
-            return self._convert_create_output(response)
+            return self._convert_create_output(response, created_at)
 
     @overload
     async def acompletion(
@@ -241,11 +242,13 @@ class OpenAIClient(ClientABC):
         openai_unsupported_kwargs = filter_none(extra_body) or None
 
         logger.debug(f'Entering semaphore for model: {model}')
-        try:
-            # NOTE(stomoya): We explicitly pass all the arguments to these functions for type checkers to correctly
-            #   resolve the overloads for `.create()`.
-            async with self.semaphore:
-                logger.debug(f'Acquired semaphore for model: {model}')
+        async with self.semaphore:
+            logger.debug(f'Acquired semaphore for model: {model}')
+            created_at = get_utc_timestamp()
+
+            try:
+                # NOTE(stomoya): We explicitly pass all the arguments to these functions for type checkers to correctly
+                #   resolve the overloads for `.create()`.
                 if response_format is None:
                     response = await self._client.chat.completions.create(
                         model=model,
@@ -260,7 +263,7 @@ class OpenAIClient(ClientABC):
                         reasoning_effort=reasoning_effort,
                         extra_body=openai_unsupported_kwargs,
                     )
-                    return self.convert_output(response=response)
+                    return self.convert_output(response=response, created_at=created_at)
                 else:
                     response = await self._client.chat.completions.parse(
                         model=model,
@@ -275,7 +278,7 @@ class OpenAIClient(ClientABC):
                         reasoning_effort=reasoning_effort,
                         extra_body=openai_unsupported_kwargs,
                     )
-                    return self.convert_output(response=response)
-        except Exception as e:
-            logger.exception('OpenAI API call failed')
-            return create_failed_response(response=None, fail_reason=f'{e!s}')
+                    return self.convert_output(response=response, created_at=created_at)
+            except Exception as e:
+                logger.exception('OpenAI API call failed')
+                return create_failed_response(response=None, fail_reason=f'{e!s}', created_at=created_at)
