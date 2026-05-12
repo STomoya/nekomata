@@ -3,6 +3,7 @@
 from typing import Any
 
 from nekomata.types.integrations import ChatCompletionResponse, ChatCompletionStatus
+from nekomata.utils import get_utc_timestamp
 
 
 def create_failed_response[ResponseT](
@@ -11,8 +12,10 @@ def create_failed_response[ResponseT](
     created_at: float,
 ) -> ChatCompletionResponse[None]:
     """Create a failed chat completion object."""
+    elapsed = get_utc_timestamp() - created_at
     return ChatCompletionResponse(
         created_at=created_at,
+        elapsed=elapsed,
         status=ChatCompletionStatus.FAILED,
         original=response,
         fail_reason=fail_reason,

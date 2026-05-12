@@ -114,10 +114,9 @@ class OpenAIClient(ClientABC):
 
     def _convert_create_output(self, response: ChatCompletion, created_at: float) -> ChatCompletionResponse[None]:
         common_attrs = self._extract_common_attrs(response=response)
+        elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[None](
-            created_at=created_at,
-            original=response,
-            **common_attrs._asdict(),
+            created_at=created_at, elapsed=elapsed, original=response, **common_attrs._asdict()
         )
         return converted_response
 
@@ -125,14 +124,10 @@ class OpenAIClient(ClientABC):
         self, response: ParsedChatCompletion[ResponseFormatT], created_at: float
     ) -> ChatCompletionResponse[ResponseFormatT]:
         common_attrs = self._extract_common_attrs(response=response)
-
         parsed = response.choices[0].message.parsed
-
+        elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[ResponseFormatT](
-            created_at=created_at,
-            original=response,
-            parsed=parsed,
-            **common_attrs._asdict(),
+            created_at=created_at, elapsed=elapsed, original=response, parsed=parsed, **common_attrs._asdict()
         )
         return converted_response
 
