@@ -33,7 +33,7 @@ uv add git+https://github.com/STomoya/nekomata
 
 ```python
 import asyncio
-from nekomata.dispatcher.dispatcher import AsyncLLMDispatcher
+from nekomata import AsyncLLMDispatcher
 
 async def main():
     async with AsyncLLMDispatcher() as dispatcher:
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 ### Synchronous Usage
 
 ```python
-from nekomata.dispatcher.sync import SyncLLMDispatcher
+from nekomata import SyncLLMDispatcher
 
 def main():
     with SyncLLMDispatcher() as dispatcher:
@@ -92,7 +92,7 @@ Nekomata makes it easy to get structured data back from LLMs using Pydantic mode
 
 ```python
 from pydantic import BaseModel
-from nekomata.dispatcher.sync import SyncLLMDispatcher
+from nekomata import SyncLLMDispatcher
 
 class CatInfo(BaseModel):
     breed: str
@@ -137,7 +137,7 @@ When submitting multiple requests, they may complete in a different order than t
 
 ```python
 import concurrent.futures
-from nekomata.dispatcher.sync import SyncLLMDispatcher
+from nekomata import SyncLLMDispatcher
 
 prompts = {
     "meow1": "Write a haiku about a cat sleeping in a sunbeam.",
