@@ -78,7 +78,7 @@ class ClientABC(ABC):
 
     @abstractmethod
     def convert_output(
-        self, response: ResponseT, created_at: float
+        self, response: ResponseT, created_at: float, custom_id: str | None = None
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert raw response to a flatter response object."""
         raise NotImplementedError
@@ -101,6 +101,7 @@ class ClientABC(ABC):
         response_format: None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None]: ...
 
     # Overload for structured output LLM api calls.
@@ -121,6 +122,7 @@ class ClientABC(ABC):
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     @abstractmethod
@@ -139,6 +141,7 @@ class ClientABC(ABC):
         response_format: type[ResponseFormatT] | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Async completion API call."""
         raise NotImplementedError

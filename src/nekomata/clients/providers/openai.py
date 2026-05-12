@@ -14,6 +14,7 @@ from nekomata.clients.utils import create_failed_response, filter_none
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.types.openai import OpenAIChatCompletionCommonAttrs
 from nekomata.utils import get_logger, get_utc_timestamp
+from nekomata.utils.uuid import create_uuid
 
 ResponseFormatT = TypeVar('ResponseFormatT')
 
@@ -112,41 +113,50 @@ class OpenAIClient(ClientABC):
         )
         return common_attrs
 
-    def _convert_create_output(self, response: ChatCompletion, created_at: float) -> ChatCompletionResponse[None]:
+    def _convert_create_output(
+        self, response: ChatCompletion, created_at: float, custom_id: str | None = None
+    ) -> ChatCompletionResponse[None]:
         common_attrs = self._extract_common_attrs(response=response)
+        id = custom_id or create_uuid()
         elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[None](
-            created_at=created_at, elapsed=elapsed, original=response, **common_attrs._asdict()
+            id=id, created_at=created_at, elapsed=elapsed, original=response, **common_attrs._asdict()
         )
         return converted_response
 
     def _convert_parse_output(
-        self, response: ParsedChatCompletion[ResponseFormatT], created_at: float
+        self, response: ParsedChatCompletion[ResponseFormatT], created_at: float, custom_id: str | None = None
     ) -> ChatCompletionResponse[ResponseFormatT]:
         common_attrs = self._extract_common_attrs(response=response)
         parsed = response.choices[0].message.parsed
+        id = custom_id or create_uuid()
         elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[ResponseFormatT](
-            created_at=created_at, elapsed=elapsed, original=response, parsed=parsed, **common_attrs._asdict()
+            id=id, created_at=created_at, elapsed=elapsed, original=response, parsed=parsed, **common_attrs._asdict()
         )
         return converted_response
 
     @overload
-    def convert_output(self, response: ChatCompletion, created_at: float) -> ChatCompletionResponse[None]: ...
+    def convert_output(
+        self, response: ChatCompletion, created_at: float, custom_id: str | None = None
+    ) -> ChatCompletionResponse[None]: ...
 
     @overload
     def convert_output(
-        self, response: ParsedChatCompletion[ResponseFormatT], created_at: float
+        self, response: ParsedChatCompletion[ResponseFormatT], created_at: float, custom_id: str | None = None
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     def convert_output(
-        self, response: ChatCompletion | ParsedChatCompletion[ResponseFormatT], created_at: float
+        self,
+        response: ChatCompletion | ParsedChatCompletion[ResponseFormatT],
+        created_at: float,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert output."""
         if isinstance(response, ParsedChatCompletion):
-            return self._convert_parse_output(response, created_at)
+            return self._convert_parse_output(response=response, created_at=created_at, custom_id=custom_id)
         else:
-            return self._convert_create_output(response, created_at)
+            return self._convert_create_output(response=response, created_at=created_at, custom_id=custom_id)
 
     @overload
     async def acompletion(
@@ -164,6 +174,7 @@ class OpenAIClient(ClientABC):
         response_format: None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None]: ...
 
     @overload
@@ -182,6 +193,7 @@ class OpenAIClient(ClientABC):
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     async def acompletion(
@@ -199,6 +211,7 @@ class OpenAIClient(ClientABC):
         response_format: type[ResponseFormatT] | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Call OpenAI compatible API.
 
@@ -218,6 +231,7 @@ class OpenAIClient(ClientABC):
             reasoning_effort (Literal['high', 'medium', 'low', 'minimal'] | None, optional): Reasoning effort.
                 Defaults to None.
             extra_body (dict[str, Any] | None, optional): Extra body.
+            custom_id (str | None, optional): Custom ID. This value will overwrite the response object's ID field.
 
         """
         # Construct messages object.
@@ -258,7 +272,7 @@ class OpenAIClient(ClientABC):
                         reasoning_effort=reasoning_effort,
                         extra_body=openai_unsupported_kwargs,
                     )
-                    return self.convert_output(response=response, created_at=created_at)
+                    return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
                 else:
                     response = await self._client.chat.completions.parse(
                         model=model,
@@ -273,7 +287,9 @@ class OpenAIClient(ClientABC):
                         reasoning_effort=reasoning_effort,
                         extra_body=openai_unsupported_kwargs,
                     )
-                    return self.convert_output(response=response, created_at=created_at)
+                    return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
             except Exception as e:
                 logger.exception('OpenAI API call failed')
-                return create_failed_response(response=None, fail_reason=f'{e!s}', created_at=created_at)
+                return create_failed_response(
+                    response=None, fail_reason=f'{e!s}', created_at=created_at, custom_id=custom_id
+                )
