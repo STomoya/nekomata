@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="asset/nekomata-logo-20260512.png" width="400" alt="Nekomata Logo">
+  <img src="asset/nekomata-logo-20260512.png" width="250" alt="Nekomata Logo">
 </p>
 
 # Nekomata 🐱
