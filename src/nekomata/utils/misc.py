@@ -1,5 +1,6 @@
 """Misc."""
 
+import datetime
 import os
 from typing import overload
 
@@ -28,3 +29,8 @@ def get_env[EnvVarT](name: str, type: type[EnvVarT], default: EnvVarT | None = N
     if value:
         return type(value)
     return default
+
+
+def get_utc_timestamp() -> float:
+    """Get UTC UNIX timestamp."""
+    return datetime.datetime.now(tz=datetime.timezone.utc).timestamp()
