@@ -1,6 +1,7 @@
 [project]
 name = "nekomata"
 description = "LLM dispatcher."
+license = "Apache-2.0"
 readme = "README.md"
 authors = [
     { name = "Tomoya Sawada", email = "stomoya0110@gmail.com" }
