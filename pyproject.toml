@@ -97,5 +97,10 @@ testpaths = ["tests"]
 [tool.coverage.run]
 omit = []
 
+[tool.coverage.report]
+exclude_also = [
+    "@(abc\\.)?abstractmethod",
+]
+
 [tool.ty.terminal]
 output-format = "concise"

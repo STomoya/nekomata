@@ -101,6 +101,6 @@ def create_client(
             keepalive_expiry=keepalive_expiry,
             timeout=timeout,
         )
-    else:  # Never reached. Making type checker happy.
+    else:  # pragma: no cover # Never reached. Making type checker happy.
         err_msg = f'Unknown provider "{provider}". Must be one of {SUPPORTED_PROVIDERS}'
         raise ValueError(err_msg)
