@@ -4,16 +4,20 @@ from typing import Any
 
 from nekomata.types.integrations import ChatCompletionResponse, ChatCompletionStatus
 from nekomata.utils import get_utc_timestamp
+from nekomata.utils.uuid import create_uuid
 
 
 def create_failed_response[ResponseT](
     response: ResponseT | None,
     fail_reason: str,
     created_at: float,
+    custom_id: str | None = None,
 ) -> ChatCompletionResponse[None]:
     """Create a failed chat completion object."""
+    id = custom_id or create_uuid()
     elapsed = get_utc_timestamp() - created_at
     return ChatCompletionResponse(
+        id=id,
         created_at=created_at,
         elapsed=elapsed,
         status=ChatCompletionStatus.FAILED,

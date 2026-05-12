@@ -19,6 +19,7 @@ from nekomata.clients.utils import create_failed_response
 from nekomata.types.anthropic import AnthropicMessagesCommonAttrs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger, get_utc_timestamp
+from nekomata.utils.uuid import create_uuid
 
 ResponseFormatT = TypeVar('ResponseFormatT')
 
@@ -104,39 +105,47 @@ class AnthropicClient(ClientABC):
 
         return common_attrs
 
-    def _convert_create_response(self, response: Message, created_at: float) -> ChatCompletionResponse[None]:
+    def _convert_create_response(
+        self, response: Message, created_at: float, custom_id: str | None = None
+    ) -> ChatCompletionResponse[None]:
         common_attrs = self._extract_common_attrs(response)
+        id = custom_id or create_uuid()
         elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[None](
-            created_at=created_at, elapsed=elapsed, original=response, **common_attrs._asdict()
+            id=id, created_at=created_at, elapsed=elapsed, original=response, **common_attrs._asdict()
         )
         return converted_response
 
     def _convert_parse_response(
-        self, response: ParsedMessage[ResponseFormatT], created_at: float
+        self, response: ParsedMessage[ResponseFormatT], created_at: float, custom_id: str | None = None
     ) -> ChatCompletionResponse[ResponseFormatT]:
         common_attrs = self._extract_common_attrs(response)
         parsed = response.parsed_output
+        id = custom_id or create_uuid()
         elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[ResponseFormatT](
-            created_at=created_at, elapsed=elapsed, original=response, parsed=parsed, **common_attrs._asdict()
+            id=id, created_at=created_at, elapsed=elapsed, original=response, parsed=parsed, **common_attrs._asdict()
         )
         return converted_response
 
     @overload
-    def convert_output(self, response: ParsedMessage, created_at: float) -> ChatCompletionResponse[ResponseFormatT]: ...
+    def convert_output(
+        self, response: ParsedMessage, created_at: float, custom_id: str | None = None
+    ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     @overload
-    def convert_output(self, response: Message, created_at: float) -> ChatCompletionResponse[None]: ...
+    def convert_output(
+        self, response: Message, created_at: float, custom_id: str | None = None
+    ) -> ChatCompletionResponse[None]: ...
 
     def convert_output(
-        self, response: Message | ParsedMessage[ResponseFormatT], created_at: float
+        self, response: Message | ParsedMessage[ResponseFormatT], created_at: float, custom_id: str | None = None
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert output."""
         if isinstance(response, ParsedMessage):
-            return self._convert_parse_response(response, created_at)
+            return self._convert_parse_response(response, created_at, custom_id)
         else:
-            return self._convert_create_response(response, created_at)
+            return self._convert_create_response(response, created_at, custom_id)
 
     @overload
     async def acompletion(
@@ -154,6 +163,7 @@ class AnthropicClient(ClientABC):
         response_format: None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None]: ...
 
     @overload
@@ -172,6 +182,7 @@ class AnthropicClient(ClientABC):
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     async def acompletion(
@@ -189,6 +200,7 @@ class AnthropicClient(ClientABC):
         response_format: type[ResponseFormatT] | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Call anthropic messages API.
 
@@ -213,6 +225,7 @@ class AnthropicClient(ClientABC):
             reasoning_effort (Literal['high', 'medium', 'low', 'minimal'] | None, optional): Reasoning effort.
                 Defaults to None.
             extra_body (dict[str, Any] | None, optional): IGNORED.
+            custom_id (str | None, optional): Custom ID. This value will overwrite the response object's ID field.
 
         """
         # Construct messages object.
@@ -268,4 +281,6 @@ class AnthropicClient(ClientABC):
                     return self.convert_output(response, created_at)
             except Exception as e:
                 logger.exception('Anthropic API call failed')
-                return create_failed_response(response=None, fail_reason=f'{e!s}', created_at=created_at)
+                return create_failed_response(
+                    response=None, fail_reason=f'{e!s}', created_at=created_at, custom_id=custom_id
+                )
