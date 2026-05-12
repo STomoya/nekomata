@@ -18,7 +18,12 @@ class ChatCompletionStatus(StrEnum):
 class ChatCompletionResponse[ResponseFormatT](BaseModel):
     """Chat completion response class."""
 
-    id: Annotated[str, Field(description='Internal ID.')] = Field(default_factory=create_uuid)
+    id: Annotated[str, Field(description='Request ID.')] = Field(default_factory=create_uuid)
+
+    created_at: Annotated[float, Field(description='UNIX timestamp of the request creation time.')]
+    # NOTE(stomoya): The dispatcher makes collecting per request exec time on the user-side hard, so the package
+    #   should provide the elapsed time.
+    elapsed: Annotated[float, Field(description='Elapsed time.')]
 
     status: Annotated[
         ChatCompletionStatus,

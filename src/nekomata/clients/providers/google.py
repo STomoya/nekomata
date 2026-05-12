@@ -11,7 +11,8 @@ from google.genai.types import GenerateContentResponse
 from nekomata.clients.base import ClientABC
 from nekomata.clients.utils import create_failed_response
 from nekomata.types.integrations import ChatCompletionResponse
-from nekomata.utils import get_logger
+from nekomata.utils import get_logger, get_utc_timestamp
+from nekomata.utils.uuid import create_uuid
 
 ResponseFormatT = TypeVar('ResponseFormatT')
 
@@ -60,7 +61,7 @@ class GoogleClient(ClientABC):
         self._initialized = True
 
     def convert_output(
-        self, response: GenerateContentResponse
+        self, response: GenerateContentResponse, created_at: float, custom_id: str | None = None
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert output."""
         parsed = response.parsed
@@ -102,7 +103,12 @@ class GoogleClient(ClientABC):
         else:
             total_tokens = input_tokens = output_tokens = cache_tokens = reason_tokens = None
 
+        id = custom_id or create_uuid()
+        elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[ResponseFormatT](
+            id=id,
+            created_at=created_at,
+            elapsed=elapsed,
             original=response,
             content=content_string,
             finish_reason=finish_reason,
@@ -132,6 +138,7 @@ class GoogleClient(ClientABC):
         response_format: None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None]: ...
 
     @overload
@@ -150,6 +157,7 @@ class GoogleClient(ClientABC):
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     async def acompletion(
@@ -167,6 +175,7 @@ class GoogleClient(ClientABC):
         response_format: type[ResponseFormatT] | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Async completion API call."""
         thinking_config = types.ThinkingConfig(
@@ -190,15 +199,19 @@ class GoogleClient(ClientABC):
         )
 
         logger.debug(f'Entering semaphore for model: {model}')
-        try:
-            async with self.semaphore:
-                logger.debug(f'Acquired semaphore for model: {model}')
+        async with self.semaphore:
+            logger.debug(f'Acquired semaphore for model: {model}')
+            created_at = get_utc_timestamp()
+
+            try:
                 response = await self._client.aio.models.generate_content(
                     model=model,
                     contents=prompt,
                     config=generate_content_config,
                 )
-                return self.convert_output(response=response)
-        except Exception as e:
-            logger.exception('Google API call failed')
-            return create_failed_response(response=None, fail_reason=f'{e!s}')
+                return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
+            except Exception as e:
+                logger.exception('Google API call failed')
+                return create_failed_response(
+                    response=None, fail_reason=f'{e!s}', created_at=created_at, custom_id=custom_id
+                )

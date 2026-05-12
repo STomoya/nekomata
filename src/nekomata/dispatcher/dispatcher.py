@@ -117,6 +117,7 @@ class AsyncLLMDispatcher:
         response_format: None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None]: ...
 
     @overload
@@ -136,6 +137,7 @@ class AsyncLLMDispatcher:
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     async def submit(
@@ -154,6 +156,7 @@ class AsyncLLMDispatcher:
         response_format: type[ResponseFormatT] | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Asynchronously executes an LLM request."""
         if endpoint_name not in self._configs:
@@ -177,6 +180,7 @@ class AsyncLLMDispatcher:
                 seed=seed,
                 reasoning_effort=reasoning_effort,
                 extra_body=extra_body,
+                custom_id=custom_id,
             )
         except anyio.get_cancelled_exc_class():
             logger.warning(f"Request to '{endpoint_name}' was cancelled.")
