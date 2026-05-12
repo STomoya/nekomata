@@ -102,8 +102,10 @@ class GoogleClient(ClientABC):
         else:
             total_tokens = input_tokens = output_tokens = cache_tokens = reason_tokens = None
 
+        elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[ResponseFormatT](
             created_at=created_at,
+            elapsed=elapsed,
             original=response,
             content=content_string,
             finish_reason=finish_reason,

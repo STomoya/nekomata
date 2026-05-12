@@ -106,8 +106,9 @@ class AnthropicClient(ClientABC):
 
     def _convert_create_response(self, response: Message, created_at: float) -> ChatCompletionResponse[None]:
         common_attrs = self._extract_common_attrs(response)
+        elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[None](
-            created_at=created_at, original=response, **common_attrs._asdict()
+            created_at=created_at, elapsed=elapsed, original=response, **common_attrs._asdict()
         )
         return converted_response
 
@@ -116,8 +117,9 @@ class AnthropicClient(ClientABC):
     ) -> ChatCompletionResponse[ResponseFormatT]:
         common_attrs = self._extract_common_attrs(response)
         parsed = response.parsed_output
+        elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[ResponseFormatT](
-            created_at=created_at, original=response, parsed=parsed, **common_attrs._asdict()
+            created_at=created_at, elapsed=elapsed, original=response, parsed=parsed, **common_attrs._asdict()
         )
         return converted_response
 
