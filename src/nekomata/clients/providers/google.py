@@ -11,7 +11,7 @@ from google.genai.types import GenerateContentResponse
 from nekomata.clients.base import ClientABC
 from nekomata.clients.utils import create_failed_response
 from nekomata.types.integrations import ChatCompletionResponse
-from nekomata.utils import get_logger
+from nekomata.utils import get_logger, get_utc_timestamp
 
 ResponseFormatT = TypeVar('ResponseFormatT')
 
@@ -60,7 +60,7 @@ class GoogleClient(ClientABC):
         self._initialized = True
 
     def convert_output(
-        self, response: GenerateContentResponse
+        self, response: GenerateContentResponse, created_at: float
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert output."""
         parsed = response.parsed
@@ -103,6 +103,7 @@ class GoogleClient(ClientABC):
             total_tokens = input_tokens = output_tokens = cache_tokens = reason_tokens = None
 
         converted_response = ChatCompletionResponse[ResponseFormatT](
+            created_at=created_at,
             original=response,
             content=content_string,
             finish_reason=finish_reason,
@@ -190,15 +191,17 @@ class GoogleClient(ClientABC):
         )
 
         logger.debug(f'Entering semaphore for model: {model}')
-        try:
-            async with self.semaphore:
-                logger.debug(f'Acquired semaphore for model: {model}')
+        async with self.semaphore:
+            logger.debug(f'Acquired semaphore for model: {model}')
+            created_at = get_utc_timestamp()
+
+            try:
                 response = await self._client.aio.models.generate_content(
                     model=model,
                     contents=prompt,
                     config=generate_content_config,
                 )
-                return self.convert_output(response=response)
-        except Exception as e:
-            logger.exception('Google API call failed')
-            return create_failed_response(response=None, fail_reason=f'{e!s}')
+                return self.convert_output(response=response, created_at=created_at)
+            except Exception as e:
+                logger.exception('Google API call failed')
+                return create_failed_response(response=None, fail_reason=f'{e!s}', created_at=created_at)

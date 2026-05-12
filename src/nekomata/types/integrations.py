@@ -20,6 +20,8 @@ class ChatCompletionResponse[ResponseFormatT](BaseModel):
 
     id: Annotated[str, Field(description='Internal ID.')] = Field(default_factory=create_uuid)
 
+    created_at: Annotated[float, Field(description='UNIX timestamp of the request creation time.')]
+
     status: Annotated[
         ChatCompletionStatus,
         Field(description='Status of the chat completion call.'),
