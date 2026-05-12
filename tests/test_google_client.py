@@ -1,5 +1,8 @@
 """Tests for the Google client."""
 
+import time
+from unittest.mock import ANY
+
 import pytest
 from google.genai.types import GenerateContentResponse
 from pydantic import BaseModel
@@ -71,7 +74,7 @@ class TestGoogleClient:
         response = await client.acompletion(model='gemini-1.5-pro', prompt='hi')
 
         mock_instance.aio.models.generate_content.assert_called_once()
-        mock_convert_output.assert_called_once_with(response=mock_lib_response)
+        mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
     @pytest.mark.anyio
@@ -126,7 +129,7 @@ class TestGoogleClient:
         response = await client.acompletion(model='gemini-1.5-pro', prompt='hi', response_format=MyResponse)
 
         mock_instance.aio.models.generate_content.assert_called_once()
-        mock_convert_output.assert_called_once_with(response=mock_lib_response)
+        mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
     @pytest.mark.anyio
@@ -163,7 +166,9 @@ class TestGoogleClient:
         mocker.patch('nekomata.clients.providers.google.Client')
         client = GoogleClient(api_key='test-key')
 
-        converted = client.convert_output(mock_response)
+        created_at = time.time()
+
+        converted = client.convert_output(mock_response, created_at)
 
         assert converted.original == mock_response
         assert converted.content == 'text'
@@ -183,8 +188,10 @@ class TestGoogleClient:
         mock_response = mocker.MagicMock()
         mock_response.candidates = []
 
+        created_at = time.time()
+
         with pytest.raises(ValueError, match='Response object has an empty `candidates` field'):
-            client.convert_output(mock_response)
+            client.convert_output(mock_response, created_at)
 
     def test_convert_output_empty_content(self, mocker: MockerFixture) -> None:
         """Test that convert_output raises ValueError when candidate content is empty."""
@@ -196,8 +203,10 @@ class TestGoogleClient:
         mock_candidate.content = None
         mock_response.candidates = [mock_candidate]
 
+        created_at = time.time()
+
         with pytest.raises(ValueError, match='Response object has an candidate with empty content'):
-            client.convert_output(mock_response)
+            client.convert_output(mock_response, created_at)
 
     def test_convert_output_skips_multimodal(self, mocker: MockerFixture) -> None:
         """Test that convert_output skips parts with no text (multimodal)."""
@@ -221,5 +230,7 @@ class TestGoogleClient:
         mock_response.usage_metadata = None
         mock_response.parsed = None
 
-        response = client.convert_output(mock_response)
+        created_at = time.time()
+
+        response = client.convert_output(mock_response, created_at)
         assert response.content == 'Hello'

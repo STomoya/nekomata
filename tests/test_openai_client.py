@@ -1,5 +1,8 @@
 """Tests for the OpenAI client."""
 
+import time
+from unittest.mock import ANY
+
 import pytest
 from openai.types.chat import ChatCompletion, ParsedChatCompletion
 from pydantic import BaseModel
@@ -65,7 +68,7 @@ class TestOpenAIClient:
         response = await client.acompletion(model='model', prompt='prompt')
 
         mock_lib_client.chat.completions.create.assert_called_once()
-        mock_convert_output.assert_called_once_with(response=mock_lib_response)
+        mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
     @pytest.mark.anyio
@@ -93,7 +96,7 @@ class TestOpenAIClient:
         response = await client.acompletion(model='model', prompt='prompt', response_format=MyResponse)
 
         mock_lib_client.chat.completions.parse.assert_called_once()
-        mock_convert_output.assert_called_once_with(response=mock_lib_response)
+        mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
     @pytest.mark.anyio
@@ -145,16 +148,20 @@ class TestOpenAIClient:
         mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
         client = OpenAIClient(api_key='test-key')
 
-        # .chat.completions.create response conversion.
-        create_result = client.convert_output(mock_create_response)
+        created_at = time.time()
 
-        mock_convert_create.assert_called_once_with(mock_create_response)
+        # .chat.completions.create response conversion.
+        create_result = client.convert_output(mock_create_response, created_at)
+
+        mock_convert_create.assert_called_once_with(
+            response=mock_create_response, created_at=created_at, custom_id=None
+        )
         assert create_result == 'create'
 
         # .chat.completions.parse response conversion.
-        parse_result = client.convert_output(mock_parse_response)
+        parse_result = client.convert_output(mock_parse_response, created_at)
 
-        mock_convert_parse.assert_called_once_with(mock_parse_response)
+        mock_convert_parse.assert_called_once_with(response=mock_parse_response, created_at=created_at, custom_id=None)
         assert parse_result == 'parse'
 
     @pytest.mark.anyio
@@ -196,7 +203,9 @@ class TestOpenAIClient:
 
         mock_response = chat_completion_factory()
 
-        converted = client._convert_create_output(mock_response)
+        created_at = time.time()
+
+        converted = client._convert_create_output(mock_response, created_at)
 
         assert converted.original == mock_response
         assert converted.parsed is None
@@ -220,7 +229,9 @@ class TestOpenAIClient:
         mock_response = chat_completion_factory(ParsedChatCompletion)
         mock_response.choices[0].message.parsed = MyResponse(answer='hello')
 
-        converted = client._convert_parse_output(mock_response)
+        created_at = time.time()
+
+        converted = client._convert_parse_output(mock_response, created_at)
 
         assert converted.original == mock_response
         assert converted.parsed == MyResponse(answer='hello')

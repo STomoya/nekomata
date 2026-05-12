@@ -1,5 +1,8 @@
 """Tests for the Anthropic client."""
 
+import time
+from unittest.mock import ANY
+
 import pytest
 from anthropic import Omit
 from anthropic.types import Message, ParsedMessage, TextBlock, ThinkingBlock
@@ -64,7 +67,7 @@ class TestAnthropicClient:
         response = await client.acompletion(model='model', prompt='prompt')
 
         mock_lib_client.messages.create.assert_called_once()
-        mock_convert_output.assert_called_once_with(mock_lib_response)
+        mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
     @pytest.mark.anyio
@@ -92,7 +95,7 @@ class TestAnthropicClient:
         response = await client.acompletion(model='model', prompt='prompt', response_format=MyResponse)
 
         mock_lib_client.messages.parse.assert_called_once()
-        mock_convert_output.assert_called_once_with(mock_lib_response)
+        mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
     @pytest.mark.anyio
@@ -138,16 +141,20 @@ class TestAnthropicClient:
         mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
         client = AnthropicClient(api_key='test-key')
 
-        # .messages.create response conversion.
-        create_result = client.convert_output(mock_create_response)
+        created_at = time.time()
 
-        mock_convert_create.assert_called_once_with(mock_create_response)
+        # .messages.create response conversion.
+        create_result = client.convert_output(mock_create_response, created_at)
+
+        mock_convert_create.assert_called_once_with(
+            response=mock_create_response, created_at=created_at, custom_id=None
+        )
         assert create_result == 'create'
 
         # .messages.parse response conversion.
-        parse_result = client.convert_output(mock_parse_response)
+        parse_result = client.convert_output(mock_parse_response, created_at)
 
-        mock_convert_parse.assert_called_once_with(mock_parse_response)
+        mock_convert_parse.assert_called_once_with(response=mock_parse_response, created_at=created_at, custom_id=None)
         assert parse_result == 'parse'
 
     @pytest.mark.anyio
@@ -189,7 +196,9 @@ class TestAnthropicClient:
 
         mock_response = messages_response_factory()
 
-        converted = client._convert_create_response(mock_response)
+        created_at = time.time()
+
+        converted = client._convert_create_response(mock_response, created_at)
 
         assert converted.original == mock_response
         assert converted.parsed is None
@@ -215,7 +224,9 @@ class TestAnthropicClient:
         mock_response = messages_response_factory(ParsedMessage)
         mock_response.parsed_output = MyResponse(answer='hello')
 
-        converted = client._convert_parse_response(mock_response)
+        created_at = time.time()
+
+        converted = client._convert_parse_response(mock_response, created_at)
 
         assert converted.original == mock_response
         assert converted.parsed == MyResponse(answer='hello')
