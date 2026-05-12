@@ -143,9 +143,9 @@ class AnthropicClient(ClientABC):
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert output."""
         if isinstance(response, ParsedMessage):
-            return self._convert_parse_response(response, created_at, custom_id)
+            return self._convert_parse_response(response=response, created_at=created_at, custom_id=custom_id)
         else:
-            return self._convert_create_response(response, created_at, custom_id)
+            return self._convert_create_response(response=response, created_at=created_at, custom_id=custom_id)
 
     @overload
     async def acompletion(
@@ -266,7 +266,7 @@ class AnthropicClient(ClientABC):
                         thinking=thinking or omit,
                         output_config=output_config or omit,
                     )
-                    return self.convert_output(response, created_at)
+                    return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
                 else:
                     response = await self._client.messages.parse(
                         max_tokens=max_output_tokens,
@@ -278,7 +278,7 @@ class AnthropicClient(ClientABC):
                         output_config=output_config or omit,
                         output_format=response_format,
                     )
-                    return self.convert_output(response, created_at)
+                    return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
             except Exception as e:
                 logger.exception('Anthropic API call failed')
                 return create_failed_response(

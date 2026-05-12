@@ -209,7 +209,7 @@ class GoogleClient(ClientABC):
                     contents=prompt,
                     config=generate_content_config,
                 )
-                return self.convert_output(response=response, created_at=created_at)
+                return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
             except Exception as e:
                 logger.exception('Google API call failed')
                 return create_failed_response(

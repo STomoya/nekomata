@@ -154,9 +154,9 @@ class OpenAIClient(ClientABC):
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert output."""
         if isinstance(response, ParsedChatCompletion):
-            return self._convert_parse_output(response, created_at, custom_id)
+            return self._convert_parse_output(response=response, created_at=created_at, custom_id=custom_id)
         else:
-            return self._convert_create_output(response, created_at, custom_id)
+            return self._convert_create_output(response=response, created_at=created_at, custom_id=custom_id)
 
     @overload
     async def acompletion(
@@ -272,7 +272,7 @@ class OpenAIClient(ClientABC):
                         reasoning_effort=reasoning_effort,
                         extra_body=openai_unsupported_kwargs,
                     )
-                    return self.convert_output(response=response, created_at=created_at)
+                    return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
                 else:
                     response = await self._client.chat.completions.parse(
                         model=model,
@@ -287,7 +287,7 @@ class OpenAIClient(ClientABC):
                         reasoning_effort=reasoning_effort,
                         extra_body=openai_unsupported_kwargs,
                     )
-                    return self.convert_output(response=response, created_at=created_at)
+                    return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
             except Exception as e:
                 logger.exception('OpenAI API call failed')
                 return create_failed_response(
