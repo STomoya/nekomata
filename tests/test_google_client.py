@@ -66,7 +66,7 @@ class TestGoogleClient:
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.google.GoogleClient.convert_output',
+            'nekomata.clients.providers.google.GoogleClient._convert_output',
             return_value=mock_convert_result,
         )
 
@@ -88,7 +88,7 @@ class TestGoogleClient:
         mock_instance.aio.models.generate_content = mocker.AsyncMock(return_value=mock_lib_response)
 
         mocker.patch(
-            'nekomata.clients.providers.google.GoogleClient.convert_output',
+            'nekomata.clients.providers.google.GoogleClient._convert_output',
             return_value=mocker.MagicMock(spec=ChatCompletionResponse),
         )
 
@@ -115,15 +115,16 @@ class TestGoogleClient:
         mock_lib_response = mocker.MagicMock(spec=GenerateContentResponse)
         mock_instance.aio.models.generate_content = mocker.AsyncMock(return_value=mock_lib_response)
 
-        # Mock response conversion.
-        mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
-        mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.google.GoogleClient.convert_output',
-            return_value=mock_convert_result,
-        )
-
         class MyResponse(BaseModel):
             answer: str
+
+        # Mock response conversion.
+        mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
+        mock_convert_result.parsed = MyResponse(answer='a')
+        mock_convert_output = mocker.patch(
+            'nekomata.clients.providers.google.GoogleClient._convert_output',
+            return_value=mock_convert_result,
+        )
 
         client = GoogleClient(api_key='test-key')
         response = await client.acompletion(model='gemini-1.5-pro', prompt='hi', response_format=MyResponse)
@@ -131,6 +132,43 @@ class TestGoogleClient:
         mock_instance.aio.models.generate_content.assert_called_once()
         mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
+
+    @pytest.mark.anyio
+    async def test_acompletion_structured_output_fail(self, mocker: MockerFixture) -> None:
+        """Test acompletion raises error on structured output.
+
+        `google.genai` package silently ignores the ValidationError. We force the _acompletion function to raise the
+        ValidationError when we detect this pattern and propage the error to the acompletion function, which should
+        handle the errors and notice the user.
+        """
+        mock_google_class = mocker.patch('nekomata.clients.providers.google.Client')
+        mock_instance = mock_google_class.return_value
+
+        # Mock response to avoid conversion error
+        mock_lib_response = mocker.MagicMock(spec=GenerateContentResponse)
+        mock_instance.aio.models.generate_content = mocker.AsyncMock(return_value=mock_lib_response)
+
+        # Mock response conversion.
+        mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
+        mock_convert_result.parsed = None  # Empty parsed field
+        mock_convert_result.content = '{"answer": 10}'  # With an invalid content field.
+        mock_convert_output = mocker.patch(
+            'nekomata.clients.providers.google.GoogleClient._convert_output',
+            return_value=mock_convert_result,
+        )
+
+        class MyResponse(BaseModel):
+            answer: str
+
+        client = GoogleClient(api_key='test-key')
+
+        response = await client.acompletion(model='gemini-1.5-pro', prompt='hi', response_format=MyResponse)
+
+        mock_instance.aio.models.generate_content.assert_called_once()
+        mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
+        assert response.status == ChatCompletionStatus.FAILED
+        assert response.fail_reason is not None
+        assert 'validation' in response.fail_reason
 
     @pytest.mark.anyio
     async def test_acompletion_failure(self, mocker: MockerFixture) -> None:
@@ -168,7 +206,7 @@ class TestGoogleClient:
 
         created_at = time.time()
 
-        converted = client.convert_output(mock_response, created_at)
+        converted = client._convert_output(mock_response, created_at)
 
         assert converted.original == mock_response
         assert converted.content == 'text'
@@ -191,7 +229,7 @@ class TestGoogleClient:
         created_at = time.time()
 
         with pytest.raises(ValueError, match='Response object has an empty `candidates` field'):
-            client.convert_output(mock_response, created_at)
+            client._convert_output(mock_response, created_at)
 
     def test_convert_output_empty_content(self, mocker: MockerFixture) -> None:
         """Test that convert_output raises ValueError when candidate content is empty."""
@@ -206,7 +244,7 @@ class TestGoogleClient:
         created_at = time.time()
 
         with pytest.raises(ValueError, match='Response object has an candidate with empty content'):
-            client.convert_output(mock_response, created_at)
+            client._convert_output(mock_response, created_at)
 
     def test_convert_output_skips_multimodal(self, mocker: MockerFixture) -> None:
         """Test that convert_output skips parts with no text (multimodal)."""
@@ -232,5 +270,5 @@ class TestGoogleClient:
 
         created_at = time.time()
 
-        response = client.convert_output(mock_response, created_at)
+        response = client._convert_output(mock_response, created_at)
         assert response.content == 'Hello'
