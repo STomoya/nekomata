@@ -4,16 +4,13 @@ from types import TracebackType
 from typing import Any, Literal, Self, TypeVar, overload
 
 import anyio
-from anthropic import AnthropicError
-from google.genai.errors import APIError
-from openai import OpenAIError
 
 from nekomata.clients.factory import create_client
 from nekomata.clients.providers.anthropic import AnthropicClient
 from nekomata.clients.providers.google import GoogleClient
 from nekomata.clients.providers.openai import OpenAIClient
 from nekomata.types.dispatcher import EndpointConfig
-from nekomata.types.integrations import ChatCompletionResponse
+from nekomata.types.integrations import ChatCompletionResponse, ChatCompletionStatus
 from nekomata.utils import get_logger
 
 ResponseFormatT = TypeVar('ResponseFormatT')
@@ -185,15 +182,16 @@ class AsyncLLMDispatcher:
         except anyio.get_cancelled_exc_class():
             logger.warning(f"Request to '{endpoint_name}' was cancelled.")
             raise
-        except (OpenAIError, AnthropicError, APIError):
-            logger.exception(f"Client package error on '{endpoint_name}'")
-            raise
+        # Client specific errors are handled inside the client classes.
         except Exception:
             logger.exception(f"Unexpected error processing LLM request on '{endpoint_name}'")
             raise
         else:
-            logger.debug(
-                f"Request to '{endpoint_name}' successful. "
-                f'Usage: {response.total_tokens if response.total_tokens else "N/A"} tokens'
-            )
+            if response.status == ChatCompletionStatus.SUCCESS:
+                logger.debug(
+                    f"Request to '{endpoint_name}' successful. "
+                    f'Usage: {response.total_tokens if response.total_tokens else "N/A"} tokens'
+                )
+            elif response.status == ChatCompletionStatus.FAILED:
+                logger.debug(f"Request to '{endpoint_name}' failed. Check error logs.")
             return response
