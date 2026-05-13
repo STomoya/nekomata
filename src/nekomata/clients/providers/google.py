@@ -3,7 +3,7 @@
 NOTE(stomoya): Currently, we have no plan to support the vertexai version.
 """
 
-from typing import Any, Literal, TypeVar, cast, overload
+from typing import Any, Literal, TypeVar, cast
 
 from google.genai import Client, types
 from google.genai.types import GenerateContentResponse
@@ -121,31 +121,11 @@ class GoogleClient(ClientABC):
         )
         return converted_response
 
-    @overload
-    async def acompletion(
+    async def _acompletion(
         self,
+        created_at: float,
         model: str,
         prompt: str,
-        system_prompt: str | None = None,
-        max_output_tokens: int | None = None,
-        temperature: float | None = None,
-        top_p: float | None = None,
-        top_k: int | None = None,
-        presence_penalty: float | None = None,
-        frequency_penalty: float | None = None,
-        seed: int | None = None,
-        response_format: None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
-        extra_body: dict[str, Any] | None = None,
-        custom_id: str | None = None,
-    ) -> ChatCompletionResponse[None]: ...
-
-    @overload
-    async def acompletion(
-        self,
-        model: str,
-        prompt: str,
-        response_format: type[ResponseFormatT],
         system_prompt: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
@@ -155,24 +135,7 @@ class GoogleClient(ClientABC):
         frequency_penalty: float | None = None,
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
-        extra_body: dict[str, Any] | None = None,
-        custom_id: str | None = None,
-    ) -> ChatCompletionResponse[ResponseFormatT]: ...
-
-    async def acompletion(
-        self,
-        model: str,
-        prompt: str,
-        system_prompt: str | None = None,
-        max_output_tokens: int | None = None,
-        temperature: float | None = None,
-        top_p: float | None = None,
-        top_k: int | None = None,
-        presence_penalty: float | None = None,
-        frequency_penalty: float | None = None,
-        seed: int | None = None,
         response_format: type[ResponseFormatT] | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
@@ -197,19 +160,9 @@ class GoogleClient(ClientABC):
             thinking_config=thinking_config,
         )
 
-        logger.debug(f'Entering semaphore for model: {model}')
-        async with self.semaphore:
-            logger.debug(f'Acquired semaphore for model: {model}')
-            created_at = get_utc_timestamp()
-
-            try:
-                response = await self._client.aio.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                    config=generate_content_config,
-                )
-                return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
-            except Exception as e:
-                return self.handle_exception(
-                    err_msg='Google API call failed', exc=e, created_at=created_at, custom_id=custom_id
-                )
+        response = await self._client.aio.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=generate_content_config,
+        )
+        return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)

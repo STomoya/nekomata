@@ -146,31 +146,11 @@ class AnthropicClient(ClientABC):
         else:
             return self._convert_create_response(response=response, created_at=created_at, custom_id=custom_id)
 
-    @overload
-    async def acompletion(
+    async def _acompletion(
         self,
+        created_at: float,
         model: str,
         prompt: str,
-        system_prompt: str | None = None,
-        max_output_tokens: int | None = None,
-        temperature: float | None = None,
-        top_p: float | None = None,
-        top_k: int | None = None,
-        presence_penalty: float | None = None,
-        frequency_penalty: float | None = None,
-        seed: int | None = None,
-        response_format: None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
-        extra_body: dict[str, Any] | None = None,
-        custom_id: str | None = None,
-    ) -> ChatCompletionResponse[None]: ...
-
-    @overload
-    async def acompletion(
-        self,
-        model: str,
-        prompt: str,
-        response_format: type[ResponseFormatT],
         system_prompt: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
@@ -180,53 +160,11 @@ class AnthropicClient(ClientABC):
         frequency_penalty: float | None = None,
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
-        extra_body: dict[str, Any] | None = None,
-        custom_id: str | None = None,
-    ) -> ChatCompletionResponse[ResponseFormatT]: ...
-
-    async def acompletion(
-        self,
-        model: str,
-        prompt: str,
-        system_prompt: str | None = None,
-        max_output_tokens: int | None = None,
-        temperature: float | None = None,
-        top_p: float | None = None,
-        top_k: int | None = None,
-        presence_penalty: float | None = None,
-        frequency_penalty: float | None = None,
-        seed: int | None = None,
         response_format: type[ResponseFormatT] | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
-        """Call anthropic messages API.
-
-        `max_output_tokens` is required by the messages API. Will default to 4096 if not provided.
-        `reasoning_effort='minimal'` is not supported. Will fallback to disabled.
-        `temperature`, `top_p`, `top_k` are deperecated by Anthropic and will be ignored.
-        `presence_penalty`, `frequency_penalty`, `seed`, `extra_body` are unsupported by Anthropic and will be ignored.
-
-        Args:
-            model (str): The name of the model. Example: `gpt-5`.
-            prompt (str): User input.
-            system_prompt (str | None, optional): System prompt. Defaults to None.
-            max_output_tokens (str | None, optional): Maximum output tokens. Defaults to None.
-            temperature (float | None, optional): IGNORED. Defaults to None.
-            top_p (float | None, optional): IGNORED. Defaults to None.
-            top_k (int | None, optional): IGNORED. Defaults to None.
-            presence_penalty (float | None, optional): IGNORED. Defaults to None.
-            frequency_penalty (float | None, optional): IGNORED. Defatuls to None.
-            seed (int | None): IGNORED. Defaults to None.
-            response_format (type[BaseModel] | None, optional): JSON response format defined as a pydantic model.
-                Defaults to None.
-            reasoning_effort (Literal['high', 'medium', 'low', 'minimal'] | None, optional): Reasoning effort.
-                Defaults to None.
-            extra_body (dict[str, Any] | None, optional): IGNORED.
-            custom_id (str | None, optional): Custom ID. This value will overwrite the response object's ID field.
-
-        """
+        """Call anthropic messages API."""
         # Construct messages object.
         messages: list[MessageParam] = [{'role': 'user', 'content': prompt}]
 
@@ -248,37 +186,26 @@ class AnthropicClient(ClientABC):
         #   unsupported: presence_penalty, frequency_penalty, seed, extra_body
 
         omit = Omit()
-
-        logger.debug(f'Entering semaphore for model: {model}')
-        async with self.semaphore:
-            logger.debug(f'Acquired semaphore for model: {model}')
-            created_at = get_utc_timestamp()
-
-            try:
-                if response_format is None:
-                    response = await self._client.messages.create(
-                        max_tokens=max_output_tokens,
-                        messages=messages,
-                        model=model,
-                        stream=False,
-                        system=system_prompt or omit,
-                        thinking=thinking or omit,
-                        output_config=output_config or omit,
-                    )
-                    return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
-                else:
-                    response = await self._client.messages.parse(
-                        max_tokens=max_output_tokens,
-                        messages=messages,
-                        model=model,
-                        stream=False,
-                        system=system_prompt or omit,
-                        thinking=thinking or omit,
-                        output_config=output_config or omit,
-                        output_format=response_format,
-                    )
-                    return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
-            except Exception as e:
-                return self.handle_exception(
-                    err_msg='Anthropic API call failed', exc=e, created_at=created_at, custom_id=custom_id
-                )
+        if response_format is None:
+            response = await self._client.messages.create(
+                max_tokens=max_output_tokens,
+                messages=messages,
+                model=model,
+                stream=False,
+                system=system_prompt or omit,
+                thinking=thinking or omit,
+                output_config=output_config or omit,
+            )
+            return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
+        else:
+            response = await self._client.messages.parse(
+                max_tokens=max_output_tokens,
+                messages=messages,
+                model=model,
+                stream=False,
+                system=system_prompt or omit,
+                thinking=thinking or omit,
+                output_config=output_config or omit,
+                output_format=response_format,
+            )
+            return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
