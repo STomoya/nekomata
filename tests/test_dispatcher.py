@@ -117,6 +117,7 @@ class TestAsyncLLMDispatcher:
                 reasoning_effort='high',
                 extra_body={'chat_template_kwargs': {'enable_thinking': True}},
                 custom_id='id-000',
+                max_model_retry=2,
             )
 
             assert response == mock_response
@@ -137,6 +138,7 @@ class TestAsyncLLMDispatcher:
                 reasoning_effort='high',
                 extra_body={'chat_template_kwargs': {'enable_thinking': True}},
                 custom_id='id-000',
+                max_model_retry=2,
             )
 
     @pytest.mark.anyio
