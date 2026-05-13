@@ -7,6 +7,7 @@ from typing import Any, Literal, TypeVar, overload
 import anyio
 import httpx
 
+from nekomata.clients.utils import create_failed_response
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger
 
@@ -70,6 +71,13 @@ class ClientABC(ABC):
     def semaphore(self) -> anyio.Semaphore | nullcontext:
         """Semaphore."""
         return self._semaphore
+
+    def handle_exception(
+        self, err_msg: str, exc: Exception, created_at: float, custom_id: str | None
+    ) -> ChatCompletionResponse[None]:
+        """Log exception."""
+        logger.exception(err_msg)
+        return create_failed_response(response=None, fail_reason=f'{exc!s}', created_at=created_at, custom_id=custom_id)
 
     async def aclose(self) -> None:
         """Close the underlying HTTP client."""
