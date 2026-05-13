@@ -81,7 +81,7 @@ class TestAsyncLLMDispatcher:
             assert mock_create_client.call_count == 1
 
     @pytest.mark.anyio
-    async def test_submit(self, mocker: MockerFixture, mock_create_client) -> None:
+    async def test_submit_success(self, mocker: MockerFixture, mock_create_client) -> None:
         """Test registering an endpoint and submitting a request."""
         mock_client = mocker.AsyncMock()
         mock_create_client.return_value = mock_client
@@ -138,6 +138,37 @@ class TestAsyncLLMDispatcher:
                 extra_body={'chat_template_kwargs': {'enable_thinking': True}},
                 custom_id='id-000',
             )
+
+    @pytest.mark.anyio
+    async def test_submit_failed(self, mocker: MockerFixture, mock_create_client) -> None:
+        """Test registering an endpoint and submitting a request."""
+        mock_client = mocker.AsyncMock()
+        mock_create_client.return_value = mock_client
+
+        mock_logger = mocker.patch('nekomata.dispatcher.dispatcher.logger')
+
+        mock_response = ChatCompletionResponse(
+            status=ChatCompletionStatus.FAILED,
+            created_at=time.time(),
+            elapsed=10,
+            content=None,
+            finish_reason=None,
+        )
+        # Mock acompletion return value
+        mock_client.acompletion.return_value = mock_response
+
+        async with AsyncLLMDispatcher() as dispatcher:
+            dispatcher.register_endpoint(name='test', provider='openai', api_key='sk-test')
+
+            response = await dispatcher.submit(
+                endpoint_name='test',
+                model='gpt-4',
+                prompt='Say hello',
+            )
+
+            assert isinstance(response, ChatCompletionResponse)
+            assert response.status == ChatCompletionStatus.FAILED
+            mock_logger.debug.assert_called_with("Request to 'test' failed. Check error logs.")
 
     @pytest.mark.anyio
     async def test_submit_unregistered_endpoint(self) -> None:
