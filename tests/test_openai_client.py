@@ -5,7 +5,7 @@ from unittest.mock import ANY
 
 import pytest
 from openai.types.chat import ChatCompletion, ParsedChatCompletion
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from pytest_mock import MockerFixture
 
 from nekomata.clients.providers.openai import OpenAIClient
@@ -60,7 +60,7 @@ class TestOpenAIClient:
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.openai.OpenAIClient.convert_output',
+            'nekomata.clients.providers.openai.OpenAIClient._convert_output',
             return_value=mock_convert_result,
         )
 
@@ -85,7 +85,7 @@ class TestOpenAIClient:
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.openai.OpenAIClient.convert_output',
+            'nekomata.clients.providers.openai.OpenAIClient._convert_output',
             return_value=mock_convert_result,
         )
 
@@ -97,6 +97,42 @@ class TestOpenAIClient:
 
         mock_lib_client.chat.completions.parse.assert_called_once()
         mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
+        assert response == mock_convert_result
+
+    @pytest.mark.anyio
+    async def test_acompletion_structured_output_retry(self, mocker: MockerFixture) -> None:
+        """Test successful acompletion call with structured output."""
+        # Mock OpenAI client.
+        mock_lib_client_class = mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
+        mock_lib_client = mock_lib_client_class.return_value
+
+        class MyResponse(BaseModel):
+            answer: str
+
+        def _get_val_error():
+            try:
+                MyResponse(answer=1)  # ty: ignore[invalid-argument-type]
+            except ValidationError as e:
+                return e
+
+        # Mock completion parse.
+        mock_lib_response = mocker.MagicMock(spec=ParsedChatCompletion)
+        mock_lib_client.chat.completions.parse = mocker.AsyncMock(side_effect=[_get_val_error(), mock_lib_response])
+
+        # Mock response conversion.
+        mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
+        mock_convert_output = mocker.patch(
+            'nekomata.clients.providers.openai.OpenAIClient._convert_output',
+            return_value=mock_convert_result,
+        )
+
+        client = OpenAIClient(api_key='test')
+        response = await client.acompletion(
+            model='model', prompt='prompt', response_format=MyResponse, max_model_retry=2
+        )
+
+        assert mock_lib_client.chat.completions.parse.call_count == 2  # noqa: PLR2004
+        mock_convert_output.assert_called_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
     @pytest.mark.anyio
@@ -151,7 +187,7 @@ class TestOpenAIClient:
         created_at = time.time()
 
         # .chat.completions.create response conversion.
-        create_result = client.convert_output(mock_create_response, created_at)
+        create_result = client._convert_output(mock_create_response, created_at)
 
         mock_convert_create.assert_called_once_with(
             response=mock_create_response, created_at=created_at, custom_id=None
@@ -159,7 +195,7 @@ class TestOpenAIClient:
         assert create_result == 'create'
 
         # .chat.completions.parse response conversion.
-        parse_result = client.convert_output(mock_parse_response, created_at)
+        parse_result = client._convert_output(mock_parse_response, created_at)
 
         mock_convert_parse.assert_called_once_with(response=mock_parse_response, created_at=created_at, custom_id=None)
         assert parse_result == 'parse'
@@ -252,7 +288,7 @@ class TestOpenAIClient:
         mock_instance.chat.completions.create = mocker.AsyncMock(return_value=mock_lib_response)
 
         mocker.patch(
-            'nekomata.clients.providers.openai.OpenAIClient.convert_output',
+            'nekomata.clients.providers.openai.OpenAIClient._convert_output',
             return_value=mocker.MagicMock(spec=ChatCompletionResponse),
         )
 

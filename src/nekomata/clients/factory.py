@@ -7,7 +7,7 @@ from nekomata.clients.providers.google import GoogleClient
 from nekomata.clients.providers.openai import OpenAIClient
 from nekomata.utils import get_logger
 
-Client = OpenAIClient | GoogleClient | AnthropicClient
+type Client = OpenAIClient | GoogleClient | AnthropicClient
 SUPPORTED_PROVIDERS = {'openai', 'google', 'anthropic'}
 
 logger = get_logger(__name__)
@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 @overload
 def create_client(
-    provider: Literal['openai'] = 'openai',
+    provider: Literal['openai'],
     api_key: str | None = None,
     base_url: str | None = None,
     max_concurrent: int | None = None,
@@ -29,7 +29,7 @@ def create_client(
 
 @overload
 def create_client(
-    provider: Literal['google'] = 'google',
+    provider: Literal['google'],
     api_key: str | None = None,
     base_url: str | None = None,
     max_concurrent: int | None = None,
@@ -43,7 +43,7 @@ def create_client(
 
 @overload
 def create_client(
-    provider: Literal['anthropic'] = 'anthropic',
+    provider: Literal['anthropic'],
     api_key: str | None = None,
     base_url: str | None = None,
     max_concurrent: int | None = None,

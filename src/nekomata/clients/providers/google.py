@@ -3,10 +3,11 @@
 NOTE(stomoya): Currently, we have no plan to support the vertexai version.
 """
 
-from typing import Any, Literal, TypeVar, cast, overload
+from typing import Any, Literal, TypeVar
 
 from google.genai import Client, types
 from google.genai.types import GenerateContentResponse
+from pydantic import BaseModel
 
 from nekomata.clients.base import ClientABC
 from nekomata.types.integrations import ChatCompletionResponse
@@ -59,12 +60,14 @@ class GoogleClient(ClientABC):
 
         self._initialized = True
 
-    def convert_output(
-        self, response: GenerateContentResponse, created_at: float, custom_id: str | None = None
-    ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
+    def _convert_output(
+        self,
+        response: GenerateContentResponse,
+        created_at: float,
+        custom_id: str | None = None,
+    ) -> ChatCompletionResponse:
         """Convert output."""
         parsed = response.parsed
-        parsed = cast(ResponseFormatT, parsed)
 
         candidates = response.candidates
         if candidates is None or len(candidates) == 0:
@@ -104,7 +107,7 @@ class GoogleClient(ClientABC):
 
         id = custom_id or create_uuid()
         elapsed = get_utc_timestamp() - created_at
-        converted_response = ChatCompletionResponse[ResponseFormatT](
+        converted_response = ChatCompletionResponse(
             id=id,
             created_at=created_at,
             elapsed=elapsed,
@@ -121,57 +124,20 @@ class GoogleClient(ClientABC):
         )
         return converted_response
 
-    @overload
-    async def acompletion(
+    async def _acompletion(
         self,
+        created_at: float,
         model: str,
         prompt: str,
-        system_prompt: str | None = None,
-        max_output_tokens: int | None = None,
-        temperature: float | None = None,
-        top_p: float | None = None,
-        top_k: int | None = None,
-        presence_penalty: float | None = None,
-        frequency_penalty: float | None = None,
-        seed: int | None = None,
-        response_format: None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
-        extra_body: dict[str, Any] | None = None,
-        custom_id: str | None = None,
-    ) -> ChatCompletionResponse[None]: ...
-
-    @overload
-    async def acompletion(
-        self,
-        model: str,
-        prompt: str,
-        response_format: type[ResponseFormatT],
-        system_prompt: str | None = None,
-        max_output_tokens: int | None = None,
-        temperature: float | None = None,
-        top_p: float | None = None,
-        top_k: int | None = None,
-        presence_penalty: float | None = None,
-        frequency_penalty: float | None = None,
-        seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
-        extra_body: dict[str, Any] | None = None,
-        custom_id: str | None = None,
-    ) -> ChatCompletionResponse[ResponseFormatT]: ...
-
-    async def acompletion(
-        self,
-        model: str,
-        prompt: str,
-        system_prompt: str | None = None,
-        max_output_tokens: int | None = None,
-        temperature: float | None = None,
-        top_p: float | None = None,
-        top_k: int | None = None,
-        presence_penalty: float | None = None,
-        frequency_penalty: float | None = None,
-        seed: int | None = None,
         response_format: type[ResponseFormatT] | None = None,
+        system_prompt: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
+        seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
@@ -197,19 +163,23 @@ class GoogleClient(ClientABC):
             thinking_config=thinking_config,
         )
 
-        logger.debug(f'Entering semaphore for model: {model}')
-        async with self.semaphore:
-            logger.debug(f'Acquired semaphore for model: {model}')
-            created_at = get_utc_timestamp()
+        response = await self._client.aio.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=generate_content_config,
+        )
+        converted_response = self._convert_output(response=response, created_at=created_at, custom_id=custom_id)
 
-            try:
-                response = await self._client.aio.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                    config=generate_content_config,
-                )
-                return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
-            except Exception as e:
-                return self.handle_exception(
-                    err_msg='Google API call failed', exc=e, created_at=created_at, custom_id=custom_id
-                )
+        # Raise silently ignored ValidationError by re-validating response JSON schema.
+        if (
+            # structured output is used
+            response_format is not None
+            # but doesn't have a parsed object
+            and converted_response.parsed is None
+            # and seems to have succeeded generating the content.
+            and converted_response.content is not None
+            and issubclass(response_format, BaseModel)  # happy type chcker
+        ):
+            response_format.model_validate_json(converted_response.content)
+
+        return converted_response

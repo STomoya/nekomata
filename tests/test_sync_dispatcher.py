@@ -65,6 +65,7 @@ class TestSyncLLMDispatcher:
             reasoning_effort='high',
             extra_body={'chat_template_kwargs': {'enable_thinking': True}},
             custom_id='id-000',
+            max_model_retry=2,
         )
 
         assert future == mock_future
@@ -73,6 +74,7 @@ class TestSyncLLMDispatcher:
             'test',
             'gpt-4',
             'Say hello',
+            MyResponse,
             'system',
             100,
             0.7,
@@ -81,10 +83,10 @@ class TestSyncLLMDispatcher:
             0.1,
             0.1,
             42,
-            MyResponse,
             'high',
             {'chat_template_kwargs': {'enable_thinking': True}},
             'id-000',
+            2,
         )
 
     def test_submit_not_running(self) -> None:

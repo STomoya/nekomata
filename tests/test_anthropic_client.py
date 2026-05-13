@@ -59,7 +59,7 @@ class TestAnthropicClient:
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.anthropic.AnthropicClient.convert_output',
+            'nekomata.clients.providers.anthropic.AnthropicClient._convert_output',
             return_value=mock_convert_result,
         )
 
@@ -84,7 +84,7 @@ class TestAnthropicClient:
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.anthropic.AnthropicClient.convert_output',
+            'nekomata.clients.providers.anthropic.AnthropicClient._convert_output',
             return_value=mock_convert_result,
         )
 
@@ -144,7 +144,7 @@ class TestAnthropicClient:
         created_at = time.time()
 
         # .messages.create response conversion.
-        create_result = client.convert_output(mock_create_response, created_at)
+        create_result = client._convert_output(mock_create_response, created_at)
 
         mock_convert_create.assert_called_once_with(
             response=mock_create_response, created_at=created_at, custom_id=None
@@ -152,7 +152,7 @@ class TestAnthropicClient:
         assert create_result == 'create'
 
         # .messages.parse response conversion.
-        parse_result = client.convert_output(mock_parse_response, created_at)
+        parse_result = client._convert_output(mock_parse_response, created_at)
 
         mock_convert_parse.assert_called_once_with(response=mock_parse_response, created_at=created_at, custom_id=None)
         assert parse_result == 'parse'
