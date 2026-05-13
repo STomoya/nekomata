@@ -109,6 +109,7 @@ class SyncLLMDispatcher:
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        max_model_retry: int = 1,
     ) -> concurrent.futures.Future[ChatCompletionResponse[None]]: ...
 
     @overload
@@ -129,6 +130,7 @@ class SyncLLMDispatcher:
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        max_model_retry: int = 1,
     ) -> concurrent.futures.Future[ChatCompletionResponse[ResponseFormatT]]: ...
 
     def submit(
@@ -148,6 +150,7 @@ class SyncLLMDispatcher:
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        max_model_retry: int = 1,
     ) -> concurrent.futures.Future[ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]]:
         """Submit a request to the background loop, returning a synchronous Future."""
         with self._lock:
@@ -161,6 +164,7 @@ class SyncLLMDispatcher:
             endpoint_name,
             model,
             prompt,
+            response_format,
             system_prompt,
             max_output_tokens,
             temperature,
@@ -169,8 +173,8 @@ class SyncLLMDispatcher:
             presence_penalty,
             frequency_penalty,
             seed,
-            response_format,
             reasoning_effort,
             extra_body,
             custom_id,
+            max_model_retry,
         )

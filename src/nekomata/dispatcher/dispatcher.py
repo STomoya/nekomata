@@ -103,6 +103,7 @@ class AsyncLLMDispatcher:
         endpoint_name: str,
         model: str,
         prompt: str,
+        response_format: None = None,
         system_prompt: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
@@ -111,10 +112,10 @@ class AsyncLLMDispatcher:
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        response_format: None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        max_model_retry: int = 1,
     ) -> ChatCompletionResponse[None]: ...
 
     @overload
@@ -135,6 +136,7 @@ class AsyncLLMDispatcher:
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        max_model_retry: int = 1,
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     async def submit(
@@ -142,6 +144,7 @@ class AsyncLLMDispatcher:
         endpoint_name: str,
         model: str,
         prompt: str,
+        response_format: type[ResponseFormatT] | None = None,
         system_prompt: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
@@ -150,10 +153,10 @@ class AsyncLLMDispatcher:
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        response_format: type[ResponseFormatT] | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        max_model_retry: int = 1,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Asynchronously executes an LLM request."""
         if endpoint_name not in self._configs:
@@ -178,6 +181,7 @@ class AsyncLLMDispatcher:
                 reasoning_effort=reasoning_effort,
                 extra_body=extra_body,
                 custom_id=custom_id,
+                max_model_retry=max_model_retry,
             )
         except anyio.get_cancelled_exc_class():
             logger.warning(f"Request to '{endpoint_name}' was cancelled.")
