@@ -83,19 +83,13 @@ class ClientABC(ABC):
 
     # region abstractmethod
 
-    @abstractmethod
-    def convert_output(
-        self, response: ResponseT, created_at: float, custom_id: str | None = None
-    ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
-        """Convert raw response to a flatter response object."""
-        raise NotImplementedError
-
-    @abstractmethod
+    @overload
     async def _acompletion(
         self,
         created_at: float,
         model: str,
         prompt: str,
+        response_format: type[ResponseFormatT],
         system_prompt: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
@@ -105,7 +99,46 @@ class ClientABC(ABC):
         frequency_penalty: float | None = None,
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
+    ) -> ChatCompletionResponse[ResponseFormatT]: ...
+
+    @overload
+    async def _acompletion(
+        self,
+        created_at: float,
+        model: str,
+        prompt: str,
+        response_format: None = None,
+        system_prompt: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
+        seed: int | None = None,
+        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
+    ) -> ChatCompletionResponse[None]: ...
+
+    @abstractmethod
+    async def _acompletion(
+        self,
+        created_at: float,
+        model: str,
+        prompt: str,
         response_format: type[ResponseFormatT] | None = None,
+        system_prompt: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
+        seed: int | None = None,
+        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:

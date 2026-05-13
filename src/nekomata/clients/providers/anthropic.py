@@ -1,6 +1,6 @@
 """Anthropic Client."""
 
-from typing import Any, Literal, TypeVar, overload
+from typing import Any, Literal, TypeVar
 
 from anthropic import AsyncAnthropic, Omit
 from anthropic.types import (
@@ -127,17 +127,7 @@ class AnthropicClient(ClientABC):
         )
         return converted_response
 
-    @overload
-    def convert_output(
-        self, response: ParsedMessage, created_at: float, custom_id: str | None = None
-    ) -> ChatCompletionResponse[ResponseFormatT]: ...
-
-    @overload
-    def convert_output(
-        self, response: Message, created_at: float, custom_id: str | None = None
-    ) -> ChatCompletionResponse[None]: ...
-
-    def convert_output(
+    def _convert_output(
         self, response: Message | ParsedMessage[ResponseFormatT], created_at: float, custom_id: str | None = None
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert output."""
@@ -151,6 +141,7 @@ class AnthropicClient(ClientABC):
         created_at: float,
         model: str,
         prompt: str,
+        response_format: type[ResponseFormatT] | None = None,
         system_prompt: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
@@ -160,7 +151,6 @@ class AnthropicClient(ClientABC):
         frequency_penalty: float | None = None,
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
-        response_format: type[ResponseFormatT] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
@@ -196,7 +186,7 @@ class AnthropicClient(ClientABC):
                 thinking=thinking or omit,
                 output_config=output_config or omit,
             )
-            return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
+            return self._convert_output(response=response, created_at=created_at, custom_id=custom_id)
         else:
             response = await self._client.messages.parse(
                 max_tokens=max_output_tokens,
@@ -208,4 +198,4 @@ class AnthropicClient(ClientABC):
                 output_config=output_config or omit,
                 output_format=response_format,
             )
-            return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
+            return self._convert_output(response=response, created_at=created_at, custom_id=custom_id)

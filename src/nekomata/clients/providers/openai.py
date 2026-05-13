@@ -1,6 +1,6 @@
 """OpenAI Client."""
 
-from typing import Any, Literal, TypeVar, overload
+from typing import Any, Literal, TypeVar
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
@@ -136,17 +136,7 @@ class OpenAIClient(ClientABC):
         )
         return converted_response
 
-    @overload
-    def convert_output(
-        self, response: ChatCompletion, created_at: float, custom_id: str | None = None
-    ) -> ChatCompletionResponse[None]: ...
-
-    @overload
-    def convert_output(
-        self, response: ParsedChatCompletion[ResponseFormatT], created_at: float, custom_id: str | None = None
-    ) -> ChatCompletionResponse[ResponseFormatT]: ...
-
-    def convert_output(
+    def _convert_output(
         self,
         response: ChatCompletion | ParsedChatCompletion[ResponseFormatT],
         created_at: float,
@@ -163,6 +153,7 @@ class OpenAIClient(ClientABC):
         created_at: float,
         model: str,
         prompt: str,
+        response_format: type[ResponseFormatT] | None = None,
         system_prompt: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
@@ -172,7 +163,6 @@ class OpenAIClient(ClientABC):
         frequency_penalty: float | None = None,
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
-        response_format: type[ResponseFormatT] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
@@ -205,7 +195,7 @@ class OpenAIClient(ClientABC):
                 reasoning_effort=reasoning_effort,
                 extra_body=openai_unsupported_kwargs,
             )
-            return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
+            return self._convert_output(response=response, created_at=created_at, custom_id=custom_id)
         else:
             response = await self._client.chat.completions.parse(
                 model=model,
@@ -220,4 +210,4 @@ class OpenAIClient(ClientABC):
                 reasoning_effort=reasoning_effort,
                 extra_body=openai_unsupported_kwargs,
             )
-            return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
+            return self._convert_output(response=response, created_at=created_at, custom_id=custom_id)
