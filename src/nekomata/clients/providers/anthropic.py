@@ -15,7 +15,6 @@ from anthropic.types import (
 )
 
 from nekomata.clients.base import ClientABC
-from nekomata.clients.utils import create_failed_response
 from nekomata.types.anthropic import AnthropicMessagesCommonAttrs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger, get_utc_timestamp
@@ -280,7 +279,6 @@ class AnthropicClient(ClientABC):
                     )
                     return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
             except Exception as e:
-                logger.exception('Anthropic API call failed')
-                return create_failed_response(
-                    response=None, fail_reason=f'{e!s}', created_at=created_at, custom_id=custom_id
+                return self.handle_exception(
+                    err_msg='Anthropic API call failed', exc=e, created_at=created_at, custom_id=custom_id
                 )

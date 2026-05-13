@@ -9,7 +9,6 @@ from google.genai import Client, types
 from google.genai.types import GenerateContentResponse
 
 from nekomata.clients.base import ClientABC
-from nekomata.clients.utils import create_failed_response
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger, get_utc_timestamp
 from nekomata.utils.uuid import create_uuid
@@ -211,7 +210,6 @@ class GoogleClient(ClientABC):
                 )
                 return self.convert_output(response=response, created_at=created_at, custom_id=custom_id)
             except Exception as e:
-                logger.exception('Google API call failed')
-                return create_failed_response(
-                    response=None, fail_reason=f'{e!s}', created_at=created_at, custom_id=custom_id
+                return self.handle_exception(
+                    err_msg='Google API call failed', exc=e, created_at=created_at, custom_id=custom_id
                 )
