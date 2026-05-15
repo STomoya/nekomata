@@ -1,17 +1,32 @@
 #!/bin/bash
 set -e
 
+# ==========================================
+# 0. Detect Containerization CLI
+# ==========================================
+if command -v docker >/dev/null 2>&1; then
+    CONTAINER_CMD="docker"
+elif command -v podman >/dev/null 2>&1; then
+    CONTAINER_CMD="podman"
+else
+    echo "❌ Error: Neither 'docker' nor 'podman' was found in your PATH."
+    echo "   Please install a container runtime to continue."
+    exit 1
+fi
+
 # Use the first script argument as the versions, or default to 3.12 -> 3.14
 PYTHON_VERSIONS=${1:-"3.12 3.13 3.14"}
 IMAGE_NAME="uv-test-matrix"
 
-# 1. Ensure pyproject.toml exists
+# ==========================================
+# 1. Parse pyproject.toml
+# ==========================================
 if [ ! -f "pyproject.toml" ]; then
     echo "❌ Error: pyproject.toml not found in the current directory."
     exit 1
 fi
 
-# 2. Extract the minimum required Python version
+# Extract the minimum required Python version
 MIN_PYTHON_VERSION=$(grep -m 1 -E '^requires-python' pyproject.toml | grep -oE '[0-9]+\.[0-9]+' | head -1)
 
 # Fallback in case the field is missing or unparsable
@@ -23,11 +38,12 @@ fi
 # Extract the minimum minor version integer (e.g., '11' from '3.11')
 MIN_MINOR=$(echo "$MIN_PYTHON_VERSION" | cut -d. -f2)
 
+# ==========================================
+# 2. Validate Versions
+# ==========================================
 echo "🔍 Validating Python versions (Minimum required: >=$MIN_PYTHON_VERSION)..."
 
-# 3. Check that no requested version is older than the minimum
 for py in $PYTHON_VERSIONS; do
-    # Extract the minor version number of the target version (e.g., '10' from '3.10')
     target_minor=$(echo "$py" | cut -d. -f2)
 
     if [ -z "$target_minor" ] || [ "$target_minor" -lt "$MIN_MINOR" ]; then
@@ -40,18 +56,22 @@ done
 
 echo "✅ Versions validated: $PYTHON_VERSIONS"
 echo "----------------------------------------"
-echo "🔨 Building Docker image '$IMAGE_NAME'..."
 
-# Build the image, passing the dynamic versions as a build arg
-docker build \
+# ==========================================
+# 3. Build Image
+# ==========================================
+echo "🔨 Building $CONTAINER_CMD image '$IMAGE_NAME'..."
+
+$CONTAINER_CMD build \
     --file docker/test.Containerfile \
     --build-arg PYTHON_VERSIONS="$PYTHON_VERSIONS" \
     -t "$IMAGE_NAME" .
 
+# ==========================================
+# 4. Run Tests
+# ==========================================
 echo ""
-echo "✅ Build complete. Running tests..."
+echo "✅ Build complete. Running tests in $CONTAINER_CMD container..."
 echo "----------------------------------------"
 
-# Run the container (which automatically executes your run_tests.sh script)
-# --rm ensures the container is cleaned up after the tests finish
-docker run --rm "$IMAGE_NAME"
+$CONTAINER_CMD run --rm "$IMAGE_NAME"
