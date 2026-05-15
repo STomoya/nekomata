@@ -60,4 +60,4 @@ COPY --from=builder /root/.local/share/uv/python /root/.local/share/uv/python
 COPY --from=builder /app /app
 
 # Run the test matrix dynamically based on the ENV variable
-CMD ["/bin/bash", "docker/test.sh"]
+CMD ["/bin/bash", "container/test.sh"]

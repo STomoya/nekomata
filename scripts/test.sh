@@ -63,7 +63,7 @@ echo "----------------------------------------"
 echo "🔨 Building $CONTAINER_CMD image '$IMAGE_NAME'..."
 
 $CONTAINER_CMD build \
-    --file docker/test.Containerfile \
+    --file container/test.Containerfile \
     --build-arg PYTHON_VERSIONS="$PYTHON_VERSIONS" \
     -t "$IMAGE_NAME" .
 
