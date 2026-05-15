@@ -1,0 +1,13 @@
+.git/
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+asset/
+dist/
+reports/
+
+__pycache__/
+
+.converage
+.gitignore
