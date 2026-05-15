@@ -238,10 +238,9 @@ class ClientABC(ABC):
                 pydantic model. Defaults to 1.
 
         """
-        created_at = get_utc_timestamp()
-
         logger.debug(f'Entering semaphore for model: {model}')
         async with self.semaphore:
+            created_at = get_utc_timestamp()
             logger.debug(f'Acquired semaphore for model: {model}')
             try:
                 async for attempt in AsyncRetrying(
