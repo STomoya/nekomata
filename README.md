@@ -190,6 +190,107 @@ with AsyncLLMDispatcher() as dispatcher:
     )
 ```
 
+## Custom Clients
+
+Implement your own async client class. See the [abstract class](src/nekomata/clients/base.py) for more details.
+
+```python
+from llm_package_of_your_choice import AsyncClient
+
+from nekomata import register_client
+from nekomata.clients.base import ClientABC
+from nekomata.utils import get_utc_timestamp, create_uuid
+from nekomata.types import ChatCompletionStatus
+
+# Register your client to the package using the decorator.
+# This will make your client implementation be used inside the dispatcher
+# by using the registered name as the provider argument.
+@register_client(name="myclient")
+class MyClient(ClientABC):
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        max_concurrent: int | None = None,
+        max_connections: int | None = 100,
+        max_keepalive: int | None = 10,
+        keepalive_expiry: float | None = None,
+        timeout: float | None = 60.0,
+        ssl_verify: str | bool = True,
+    ):
+        # Parent __init__ creates a httpx client.
+        super(MyClient, self).__init__(
+            max_concurrent=max_concurrent,
+            max_connections=max_connections,
+            max_keepalive=max_keepalive,
+            keepalive_expiry=keepalive_expiry,
+            timeout=timeout,
+            ssl_verify=ssl_verify,
+        )
+
+        self._client = AsyncClient(
+            ...
+            httpx_client=self._http_client,  # Use the httpx client.
+        )
+
+        self._initialized = True  # Mark as initialized (currently not used).
+
+    # This is an abstractmethod. Should support the below arguments and return a
+    # ChatCompletionResponse object.
+    async def _acompletion(
+        self,
+        created_at: float,
+        model: str,
+        prompt: str,
+        response_format: type[ResponseFormatT] | None = None,
+        system_prompt: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
+        seed: int | None = None,
+        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
+    ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
+        # You only need to implement the inference and conversion to the ChatCompletionResponse object.
+        # Structured output retrying, errors, and maximum concurrent requests are already done for you.
+
+        # Do inference here...
+        # response = await self._client.chat.completions.create(...)
+        content = 'generated content'
+        reason = 'thinking...'
+        finish_reason = 'stop'
+        parsed: ResponseFormatT | None = None  # For structured output.
+        input_tokens = 10
+        output_tokens = 10
+        total_tokens = input_tokens + output_tokens
+        cache_tokens = 5
+        reason_tokens = 5
+
+        return ChatCompletionResponse(
+            id=custom_id or create_uuid(),
+            created_at=created_at,
+            elapsed=get_utc_timestamp() - created_at,
+            status=ChatCompletionStatus.SUCCESS,
+            fail_reason=None,
+            original=None,  # Place unmodified, original response here.
+            content=content,
+            reason=reason,
+            finish_reason=finish_reason,
+            parsed=parsed,
+            total_tokens=total_tokens,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_tokens=cache_tokens,
+            reason_tokens=reason_tokens,
+        )
+
+```
+
 ## Configuration
 
 When registering an endpoint, you can configure several parameters:
