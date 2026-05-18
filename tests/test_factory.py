@@ -32,11 +32,13 @@ class TestClientFactory:
 
         mock_google.assert_called_once_with(
             api_key='test-key',
+            base_url=None,
             max_concurrent=None,
             max_connections=100,
             max_keepalive=10,
             keepalive_expiry=None,
             timeout=60.0,
+            ssl_verify=True,
         )
         assert client == mock_google.return_value
 
@@ -47,11 +49,13 @@ class TestClientFactory:
 
         mock_anthropic.assert_called_once_with(
             api_key='test-key',
+            base_url=None,
             max_concurrent=None,
             max_connections=100,
             max_keepalive=10,
             keepalive_expiry=None,
             timeout=60.0,
+            ssl_verify=True,
         )
         assert client == mock_anthropic.return_value
 

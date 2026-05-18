@@ -11,3 +11,5 @@ class Envs:
 
 
 UUID_VERSION: int = get_env(Envs.UUID_VERSION, type=int, default=4)
+
+SUPPORTED_PROVIDERS = {'openai', 'google', 'anthropic'}

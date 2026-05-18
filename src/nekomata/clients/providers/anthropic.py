@@ -31,22 +31,26 @@ class AnthropicClient(ClientABC):
     def __init__(
         self,
         api_key: str | None = None,
+        base_url: str | None = None,
         max_concurrent: int | None = None,
         max_connections: int = 100,
         max_keepalive: int = 10,
         keepalive_expiry: float | None = None,
         timeout: float = 60.0,
+        ssl_verify: str | bool = True,
     ) -> None:
         """Construct AnthropicClient.
 
         Args:
             api_key (str | None, optional): Anthropic API key. If None, searches for ANTHROPIC_API_KEY environment.
                 Defaults to None.
+            base_url (str | None, optional): Base URL for compatible API endpoints. Defaults to None.
             max_concurrent (int | None): Maximum concurrent requests. Defaults to None.
             max_connections (int, optional): Maximum connections per connection pool. Defaults to 100.
             max_keepalive (int, optional): Maximum keep alive connections. Defaults to 10.
             keepalive_expiry (float | None, optional): Keep alive expiration time. Defaults to None.
             timeout (float, optional): Timeout for the client. Defaults to 60.0.
+            ssl_verify: str | bool = True,
 
         """
         super(AnthropicClient, self).__init__(
@@ -55,12 +59,12 @@ class AnthropicClient(ClientABC):
             max_keepalive=max_keepalive,
             keepalive_expiry=keepalive_expiry,
             timeout=timeout,
-            # NOTE(stomoya): Only used for accessing local unverified SSL endpoints. Hardcoding to True.
-            ssl_verify=True,
+            ssl_verify=ssl_verify,
         )
 
         self._client: AsyncAnthropic = AsyncAnthropic(
             api_key=api_key,
+            base_url=base_url,
             http_client=self._http_client,
         )
 

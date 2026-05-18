@@ -26,6 +26,8 @@ class ClientABC(ABC):
 
     def __init__(
         self,
+        api_key: str | None = None,
+        base_url: str | None = None,
         max_concurrent: int | None = None,
         max_connections: int | None = 100,
         max_keepalive: int | None = 10,
@@ -36,6 +38,8 @@ class ClientABC(ABC):
         """Construct client.
 
         Args:
+            api_key (str | None, optional): IGNORED. API key. Defaults to None.
+            base_url (str | None, optional): IGNORED. Base URL. Defaults to None.
             max_concurrent (int | None): Maximum concurrent requests. Defaults to None.
             max_connections (int, optional): Maximum connections per connection pool. Defaults to 100.
             max_keepalive (int, optional): Maximum keep alive connections. Defaults to 10.
