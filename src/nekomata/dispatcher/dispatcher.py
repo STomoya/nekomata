@@ -5,17 +5,15 @@ from typing import Any, Literal, Self, TypeVar, overload
 
 import anyio
 
+from nekomata.clients.base import ClientABC
 from nekomata.clients.factory import create_client
-from nekomata.clients.providers.anthropic import AnthropicClient
-from nekomata.clients.providers.google import GoogleClient
-from nekomata.clients.providers.openai import OpenAIClient
 from nekomata.types.dispatcher import EndpointConfig
 from nekomata.types.integrations import ChatCompletionResponse, ChatCompletionStatus
 from nekomata.utils import get_logger
 
 ResponseFormatT = TypeVar('ResponseFormatT')
 type SamplingParams = dict[str, int | float | str | bool | list[str] | None]
-type Client = OpenAIClient | GoogleClient | AnthropicClient
+type Client = ClientABC
 
 logger = get_logger(__name__)
 
