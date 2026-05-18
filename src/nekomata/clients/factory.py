@@ -58,6 +58,20 @@ def create_client(
 ) -> AnthropicClient: ...
 
 
+@overload
+def create_client(
+    provider: str,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    max_concurrent: int | None = None,
+    max_connections: int = 100,
+    max_keepalive: int = 10,
+    keepalive_expiry: float | None = None,
+    timeout: float = 60.0,
+    ssl_verify: str | bool = True,
+) -> ClientABC: ...
+
+
 def create_client(
     provider: str,
     api_key: str | None = None,

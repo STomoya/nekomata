@@ -46,7 +46,7 @@ class AsyncLLMDispatcher:
     def register_endpoint(
         self,
         name: str,
-        provider: Literal['openai', 'anthropic', 'google'],
+        provider: str,
         base_url: str | None = None,
         api_key: str | None = None,
         max_concurrent: int = 5,
