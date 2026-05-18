@@ -152,7 +152,36 @@ class SyncLLMDispatcher:
         custom_id: str | None = None,
         max_model_retry: int = 1,
     ) -> concurrent.futures.Future[ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]]:
-        """Submit a request to the background loop, returning a synchronous Future."""
+        """Execute an LLM request.
+
+        Args:
+            endpoint_name (str): The name of the endpoint to send the request to.
+            model (str): Model name.
+            prompt (str): The prompt to send.
+            response_format (type[ResponseFormatT] | None, optional): Response format defined as a pydantic BaseModel
+                subclass. We currently do not support any other formats. Defaults to None.
+            system_prompt (str | None, optional): System prompt. Defaults to None.
+            max_output_tokens (str | None, optional): Maximum output tokens. Defaults to None.
+            temperature (float | None, optional): [Sampling] Temperature parameter. Defaults to None.
+            top_p (float | None, optional): [Sampling] Top-P parameter. Defaults to None.
+            top_k (int | None, optional): [Sampling] Top-K parameter. Defaults to None.
+            presence_penalty (float | None, optional): [Sampling] Presence penalty. Defaults to None.
+            frequency_penalty (float | None, optional): [Sampling] Frequency penalty. Defatuls to None.
+            seed (int | None): [Sampling] Random seed. Defaults to None.
+            response_format (type[BaseModel] | None, optional): JSON response format defined as a pydantic model.
+                Defaults to None.
+            reasoning_effort (Literal['high', 'medium', 'low', 'minimal'] | None, optional): Reasoning effort.
+                Defaults to None.
+            extra_body (dict[str, Any] | None, optional): Extra body.
+            custom_id (str | None, optional): Custom ID. This value will overwrite the response object's ID field.
+                Defaults to None.
+            max_model_retry (int, optional): Maximum number of retries when failed to validate generated content to
+                pydantic model. Defaults to 1.
+
+        Returns:
+            ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]: Response from the API.
+
+        """
         with self._lock:
             if self._portal is None:
                 raise RuntimeError('Dispatcher is not running. Call start() or use a context manager.')
