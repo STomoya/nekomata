@@ -25,22 +25,26 @@ class GoogleClient(ClientABC):
     def __init__(
         self,
         api_key: str | None = None,
+        base_url: str | None = None,
         max_concurrent: int | None = None,
         max_connections: int = 100,
         max_keepalive: int = 10,
         keepalive_expiry: float | None = None,
         timeout: float = 60.0,
+        ssl_verify: str | bool = True,
     ) -> None:
         """Construct GoogleClient.
 
         Args:
             api_key (str | None, optional): Gemini API key. If None, searches for GEMINI_API_KEY/GOOGLE_API_KEY
                 environment variable. Defaults to None.
+            base_url (str | None, optional): Base URL for compatible API endpoints. Defaults to None.
             max_concurrent (int | None): Maximum concurrent requests. Defaults to None.
             max_connections (int, optional): Maximum connections per connection pool. Defaults to 100.
             max_keepalive (int, optional): Maximum keep alive connections. Defaults to 10.
             keepalive_expiry (float | None, optional): Keep alive expiration time. Defaults to None.
             timeout (float, optional): Timeout for the client. Defaults to 60.0.
+            ssl_verify (str | bool, optional): SSL verification specifications. Defaults to True.
 
         """
         super(GoogleClient, self).__init__(
@@ -49,13 +53,12 @@ class GoogleClient(ClientABC):
             max_keepalive=max_keepalive,
             keepalive_expiry=keepalive_expiry,
             timeout=timeout,
-            # NOTE(stomoya): Only used for accessing local unverified SSL endpoints. Hardcoding to True.
-            ssl_verify=True,
+            ssl_verify=ssl_verify,
         )
 
         self._client: Client = Client(
             api_key=api_key,
-            http_options=types.HttpOptions(httpx_async_client=self._http_client),
+            http_options=types.HttpOptions(base_url=base_url, httpx_async_client=self._http_client),
         )
 
         self._initialized = True
