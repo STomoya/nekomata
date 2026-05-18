@@ -1,7 +1,5 @@
 """Dispatcher."""
 
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict
 
 
@@ -9,7 +7,7 @@ class EndpointConfig(BaseModel):
     """Endpoint configuration model."""
 
     name: str
-    provider: Literal['openai', 'anthropic', 'google']
+    provider: str
     base_url: str | None
     api_key: str | None
     max_concurrent: int
