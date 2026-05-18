@@ -119,7 +119,18 @@ class TestSyncLLMDispatcher:
 
         dispatcher.register_endpoint(name='test', provider='openai')
 
-        dispatcher._async_dispatcher.register_endpoint.assert_called_once_with(name='test', provider='openai')  # ty: ignore[unresolved-attribute]
+        dispatcher._async_dispatcher.register_endpoint.assert_called_once_with(  # ty: ignore[unresolved-attribute]
+            name='test',
+            provider='openai',
+            base_url=None,
+            api_key=None,
+            max_concurrent=5,
+            max_connections=100,
+            max_keepalive=20,
+            keepalive_expiry=None,
+            timeout=60.0,
+            ssl_verify=True,
+        )
 
     def test_stop_close_failure(self, mocker: MockerFixture) -> None:
         """Test that failure during close() is logged but doesn't prevent portal shutdown."""

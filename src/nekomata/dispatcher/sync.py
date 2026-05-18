@@ -54,10 +54,51 @@ class SyncLLMDispatcher:
         """Exit context, decrementing the reference count."""
         self.stop()
 
-    def register_endpoint(self, *args: Any, **kwargs: Any) -> None:
-        """Pass-through configuration to the underlying async dispatcher."""
+    def register_endpoint(
+        self,
+        name: str,
+        provider: str,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        max_concurrent: int = 5,
+        max_connections: int = 100,
+        max_keepalive: int = 20,
+        keepalive_expiry: float | None = None,
+        timeout: float = 60.0,
+        ssl_verify: bool = True,
+    ) -> None:
+        """Pass-through configuration to the underlying async dispatcher.
+
+        The client will be created lazily on first model call.
+
+        Args:
+            name (str): Identical name for the client object.
+            provider (str): Provider name.
+            base_url (str | None, optional): Base URL value. Defaults to None.
+            api_key (str | None, optional): API Key. Defaults to None.
+            max_concurrent (int, optional): Maximum concurrent requests for this specific endpoint. Defaults to 5.
+            max_connections (int, optional): Maximum connections in the connection pool for this endpoint.
+                Defaults to 100.
+            max_keepalive (int, optional): Maximum connections to keep alive in this connection pool. Defaults to 20.
+            keepalive_expiry (float | None, optional): How many seconds to wait before closing dangling sessions.
+                Defaults to None.
+            timeout (float | None, optional): Timeout. Defaults to 60.0s.
+            ssl_verify (bool, optional): Toggle SSL verification. Defaults to True.
+
+        """
         with self._lock:
-            self._async_dispatcher.register_endpoint(*args, **kwargs)
+            self._async_dispatcher.register_endpoint(
+                name=name,
+                provider=provider,
+                base_url=base_url,
+                api_key=api_key,
+                max_concurrent=max_concurrent,
+                max_connections=max_connections,
+                max_keepalive=max_keepalive,
+                keepalive_expiry=keepalive_expiry,
+                timeout=timeout,
+                ssl_verify=ssl_verify,
+            )
 
     def start(self) -> None:
         """Increment the reference count and ensure the portal is running."""
