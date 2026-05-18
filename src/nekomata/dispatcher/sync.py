@@ -54,10 +54,51 @@ class SyncLLMDispatcher:
         """Exit context, decrementing the reference count."""
         self.stop()
 
-    def register_endpoint(self, *args: Any, **kwargs: Any) -> None:
-        """Pass-through configuration to the underlying async dispatcher."""
+    def register_endpoint(
+        self,
+        name: str,
+        provider: str,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        max_concurrent: int = 5,
+        max_connections: int = 100,
+        max_keepalive: int = 20,
+        keepalive_expiry: float | None = None,
+        timeout: float = 60.0,
+        ssl_verify: bool = True,
+    ) -> None:
+        """Pass-through configuration to the underlying async dispatcher.
+
+        The client will be created lazily on first model call.
+
+        Args:
+            name (str): Identical name for the client object.
+            provider (str): Provider name.
+            base_url (str | None, optional): Base URL value. Defaults to None.
+            api_key (str | None, optional): API Key. Defaults to None.
+            max_concurrent (int, optional): Maximum concurrent requests for this specific endpoint. Defaults to 5.
+            max_connections (int, optional): Maximum connections in the connection pool for this endpoint.
+                Defaults to 100.
+            max_keepalive (int, optional): Maximum connections to keep alive in this connection pool. Defaults to 20.
+            keepalive_expiry (float | None, optional): How many seconds to wait before closing dangling sessions.
+                Defaults to None.
+            timeout (float | None, optional): Timeout. Defaults to 60.0s.
+            ssl_verify (bool, optional): Toggle SSL verification. Defaults to True.
+
+        """
         with self._lock:
-            self._async_dispatcher.register_endpoint(*args, **kwargs)
+            self._async_dispatcher.register_endpoint(
+                name=name,
+                provider=provider,
+                base_url=base_url,
+                api_key=api_key,
+                max_concurrent=max_concurrent,
+                max_connections=max_connections,
+                max_keepalive=max_keepalive,
+                keepalive_expiry=keepalive_expiry,
+                timeout=timeout,
+                ssl_verify=ssl_verify,
+            )
 
     def start(self) -> None:
         """Increment the reference count and ensure the portal is running."""
@@ -152,7 +193,36 @@ class SyncLLMDispatcher:
         custom_id: str | None = None,
         max_model_retry: int = 1,
     ) -> concurrent.futures.Future[ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]]:
-        """Submit a request to the background loop, returning a synchronous Future."""
+        """Execute an LLM request.
+
+        Args:
+            endpoint_name (str): The name of the endpoint to send the request to.
+            model (str): Model name.
+            prompt (str): The prompt to send.
+            response_format (type[ResponseFormatT] | None, optional): Response format defined as a pydantic BaseModel
+                subclass. We currently do not support any other formats. Defaults to None.
+            system_prompt (str | None, optional): System prompt. Defaults to None.
+            max_output_tokens (str | None, optional): Maximum output tokens. Defaults to None.
+            temperature (float | None, optional): [Sampling] Temperature parameter. Defaults to None.
+            top_p (float | None, optional): [Sampling] Top-P parameter. Defaults to None.
+            top_k (int | None, optional): [Sampling] Top-K parameter. Defaults to None.
+            presence_penalty (float | None, optional): [Sampling] Presence penalty. Defaults to None.
+            frequency_penalty (float | None, optional): [Sampling] Frequency penalty. Defatuls to None.
+            seed (int | None): [Sampling] Random seed. Defaults to None.
+            response_format (type[BaseModel] | None, optional): JSON response format defined as a pydantic model.
+                Defaults to None.
+            reasoning_effort (Literal['high', 'medium', 'low', 'minimal'] | None, optional): Reasoning effort.
+                Defaults to None.
+            extra_body (dict[str, Any] | None, optional): Extra body.
+            custom_id (str | None, optional): Custom ID. This value will overwrite the response object's ID field.
+                Defaults to None.
+            max_model_retry (int, optional): Maximum number of retries when failed to validate generated content to
+                pydantic model. Defaults to 1.
+
+        Returns:
+            ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]: Response from the API.
+
+        """
         with self._lock:
             if self._portal is None:
                 raise RuntimeError('Dispatcher is not running. Call start() or use a context manager.')

@@ -11,7 +11,49 @@ CLIENT_REGISTRY = Registry[type[ClientABC]]()
 
 
 def register_client(name: str) -> Callable[[type[ClientABC]], type[ClientABC]]:
-    """Register a user defined client implementation to be used in the package."""
+    """Register a user defined client implementation to be used in the package.
+
+    Args:
+        name (str): The name of the Client class to register. Must be identical. Names reserved by the package are
+            "openai", "anthropic", and "google".
+
+    Examples::
+
+        from nekomata.clients import create_client
+        from nekomata.clients.registry import register_client
+        from nekomata.clients.base import ClientABC
+
+        @register_client(name="cats-ai")
+        class CatsAIClient(ClientABC):
+            # Implement required functions.
+            ...
+
+        my_client: CatsAIClient = create_client("cats-ai", ...)
+
+        # Registering reserved or duplicate names will raise an error:
+        try:
+            @register_client(name="openai")  # package reserved name
+            class MyOpenAIClient(ClientABC):
+                ...
+            @register_client(name="cats-ai")  # duplicate name
+            class CatsAIClient2(ClientABC):
+                ...
+        except Exception as e:
+            print(e)  # ValueError
+
+        # Client class must be a ClientABC subclass
+        try:
+            @register_client(name="not-subclass")
+            class NotSubclass:
+                pass
+        except Exception as e:
+            print(e)  # TypeError
+
+        # The module with the client definition must be imported before creation.
+        import my_client_module  # This will run the registration.
+        client = create_client("my-client-name", ...)
+
+    """
     if name in PACKAGE_DEFINED:
         raise ValueError(f'"{name}" is a predefined client name. Use an alternative name.')
 
