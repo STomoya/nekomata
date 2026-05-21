@@ -15,7 +15,7 @@ from anthropic.types import (
 )
 
 from nekomata.clients.base import ClientABC
-from nekomata.types.anthropic import AnthropicMessagesCommonAttrs
+from nekomata.types.anthropic import AnthropicArgs, AnthropicMessagesCommonAttrs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger, get_utc_timestamp
 from nekomata.utils.uuid import create_uuid
@@ -157,6 +157,7 @@ class AnthropicClient(ClientABC):
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        args: AnthropicArgs | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Call anthropic messages API."""
         # Construct messages object.

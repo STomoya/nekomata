@@ -66,7 +66,7 @@ class TestGoogleClient:
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.google.GoogleClient._convert_output',
+            'nekomata.clients.providers.google.GoogleClient._convert_generate_content_output',
             return_value=mock_convert_result,
         )
 
@@ -88,7 +88,7 @@ class TestGoogleClient:
         mock_instance.aio.models.generate_content = mocker.AsyncMock(return_value=mock_lib_response)
 
         mocker.patch(
-            'nekomata.clients.providers.google.GoogleClient._convert_output',
+            'nekomata.clients.providers.google.GoogleClient._convert_generate_content_output',
             return_value=mocker.MagicMock(spec=ChatCompletionResponse),
         )
 
@@ -122,7 +122,7 @@ class TestGoogleClient:
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
         mock_convert_result.parsed = MyResponse(answer='a')
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.google.GoogleClient._convert_output',
+            'nekomata.clients.providers.google.GoogleClient._convert_generate_content_output',
             return_value=mock_convert_result,
         )
 
@@ -153,7 +153,7 @@ class TestGoogleClient:
         mock_convert_result.parsed = None  # Empty parsed field
         mock_convert_result.content = '{"answer": 10}'  # With an invalid content field.
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.google.GoogleClient._convert_output',
+            'nekomata.clients.providers.google.GoogleClient._convert_generate_content_output',
             return_value=mock_convert_result,
         )
 
@@ -206,7 +206,7 @@ class TestGoogleClient:
 
         created_at = time.time()
 
-        converted = client._convert_output(mock_response, created_at)
+        converted = client._convert_generate_content_output(mock_response, created_at)
 
         assert converted.original == mock_response
         assert converted.content == 'text'
@@ -229,7 +229,7 @@ class TestGoogleClient:
         created_at = time.time()
 
         with pytest.raises(ValueError, match='Response object has an empty `candidates` field'):
-            client._convert_output(mock_response, created_at)
+            client._convert_generate_content_output(mock_response, created_at)
 
     def test_convert_output_empty_content(self, mocker: MockerFixture) -> None:
         """Test that convert_output raises ValueError when candidate content is empty."""
@@ -244,7 +244,7 @@ class TestGoogleClient:
         created_at = time.time()
 
         with pytest.raises(ValueError, match='Response object has an candidate with empty content'):
-            client._convert_output(mock_response, created_at)
+            client._convert_generate_content_output(mock_response, created_at)
 
     def test_convert_output_skips_multimodal(self, mocker: MockerFixture) -> None:
         """Test that convert_output skips parts with no text (multimodal)."""
@@ -270,5 +270,5 @@ class TestGoogleClient:
 
         created_at = time.time()
 
-        response = client._convert_output(mock_response, created_at)
+        response = client._convert_generate_content_output(mock_response, created_at)
         assert response.content == 'Hello'

@@ -11,12 +11,14 @@ from pydantic import ValidationError
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from nekomata.clients.utils import create_failed_response
+from nekomata.types.clients import PackageSpecificArgs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger
 from nekomata.utils.misc import get_utc_timestamp
 
 ResponseT = TypeVar('ResponseT')
 ResponseFormatT = TypeVar('ResponseFormatT')
+PackageArgsT = TypeVar('PackageArgsT', bound=PackageSpecificArgs)
 
 logger = get_logger(__name__)
 
@@ -105,6 +107,7 @@ class ClientABC(ABC):
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     @overload
@@ -125,6 +128,7 @@ class ClientABC(ABC):
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[None]: ...
 
     @abstractmethod
@@ -145,6 +149,7 @@ class ClientABC(ABC):
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Actual async API call implementation."""
         raise NotImplementedError

@@ -1,6 +1,8 @@
 """OpenAI specific types."""
 
-from typing import NamedTuple
+from typing import Literal, NamedTuple
+
+from nekomata.types.clients import PackageSpecificArgs
 
 
 class OpenAIChatCompletionCommonAttrs(NamedTuple):
@@ -14,3 +16,9 @@ class OpenAIChatCompletionCommonAttrs(NamedTuple):
     output_tokens: int | None
     cache_tokens: int | None
     reason_tokens: int | None
+
+
+class OpenAIArgs(PackageSpecificArgs):
+    """OpenAI package specific API arguments."""
+
+    api: Literal['chat_completions', 'responses'] = 'chat_completions'

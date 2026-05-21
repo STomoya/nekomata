@@ -12,7 +12,7 @@ from openai.types.chat import (
 from nekomata.clients.base import ClientABC
 from nekomata.clients.utils import filter_none
 from nekomata.types.integrations import ChatCompletionResponse
-from nekomata.types.openai import OpenAIChatCompletionCommonAttrs
+from nekomata.types.openai import OpenAIArgs, OpenAIChatCompletionCommonAttrs
 from nekomata.utils import get_logger, get_utc_timestamp
 from nekomata.utils.uuid import create_uuid
 
@@ -66,7 +66,7 @@ class OpenAIClient(ClientABC):
 
         self._initialized = True
 
-    def _extract_common_attrs(self, response: ChatCompletion) -> OpenAIChatCompletionCommonAttrs:
+    def _extract_chat_completion_common_attrs(self, response: ChatCompletion) -> OpenAIChatCompletionCommonAttrs:
         choices = response.choices
         if len(choices) == 0:
             raise ValueError('Response object has an empty `choices` field.')
@@ -113,10 +113,10 @@ class OpenAIClient(ClientABC):
         )
         return common_attrs
 
-    def _convert_create_output(
+    def _convert_chat_completion_create_output(
         self, response: ChatCompletion, created_at: float, custom_id: str | None = None
     ) -> ChatCompletionResponse[None]:
-        common_attrs = self._extract_common_attrs(response=response)
+        common_attrs = self._extract_chat_completion_common_attrs(response=response)
         id = custom_id or create_uuid()
         elapsed = get_utc_timestamp() - created_at
         converted_response = ChatCompletionResponse[None](
@@ -124,10 +124,10 @@ class OpenAIClient(ClientABC):
         )
         return converted_response
 
-    def _convert_parse_output(
+    def _convert_chat_completion_parse_output(
         self, response: ParsedChatCompletion[ResponseFormatT], created_at: float, custom_id: str | None = None
     ) -> ChatCompletionResponse[ResponseFormatT]:
-        common_attrs = self._extract_common_attrs(response=response)
+        common_attrs = self._extract_chat_completion_common_attrs(response=response)
         parsed = response.choices[0].message.parsed
         id = custom_id or create_uuid()
         elapsed = get_utc_timestamp() - created_at
@@ -136,7 +136,7 @@ class OpenAIClient(ClientABC):
         )
         return converted_response
 
-    def _convert_output(
+    def _convert_chat_completion_output(
         self,
         response: ChatCompletion | ParsedChatCompletion[ResponseFormatT],
         created_at: float,
@@ -144,11 +144,15 @@ class OpenAIClient(ClientABC):
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Convert output."""
         if isinstance(response, ParsedChatCompletion):
-            return self._convert_parse_output(response=response, created_at=created_at, custom_id=custom_id)
+            return self._convert_chat_completion_parse_output(
+                response=response, created_at=created_at, custom_id=custom_id
+            )
         else:
-            return self._convert_create_output(response=response, created_at=created_at, custom_id=custom_id)
+            return self._convert_chat_completion_create_output(
+                response=response, created_at=created_at, custom_id=custom_id
+            )
 
-    async def _acompletion(
+    async def _chat_completion(
         self,
         created_at: float,
         model: str,
@@ -166,7 +170,6 @@ class OpenAIClient(ClientABC):
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
-        """Call OpenAI compatible API."""
         # Construct messages object.
         messages: list[ChatCompletionMessageParam] = []
         if system_prompt:
@@ -195,7 +198,7 @@ class OpenAIClient(ClientABC):
                 reasoning_effort=reasoning_effort,
                 extra_body=openai_unsupported_kwargs,
             )
-            return self._convert_output(response=response, created_at=created_at, custom_id=custom_id)
+            return self._convert_chat_completion_output(response=response, created_at=created_at, custom_id=custom_id)
         else:
             response = await self._client.chat.completions.parse(
                 model=model,
@@ -210,4 +213,48 @@ class OpenAIClient(ClientABC):
                 reasoning_effort=reasoning_effort,
                 extra_body=openai_unsupported_kwargs,
             )
-            return self._convert_output(response=response, created_at=created_at, custom_id=custom_id)
+            return self._convert_chat_completion_output(response=response, created_at=created_at, custom_id=custom_id)
+
+    async def _acompletion(
+        self,
+        created_at: float,
+        model: str,
+        prompt: str,
+        response_format: type[ResponseFormatT] | None = None,
+        system_prompt: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
+        seed: int | None = None,
+        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
+        args: OpenAIArgs | None = None,
+    ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
+        """Call OpenAI compatible API."""
+        if args is None or args.api == 'chat_completions':
+            response = await self._chat_completion(
+                created_at=created_at,
+                model=model,
+                prompt=prompt,
+                response_format=response_format,
+                system_prompt=system_prompt,
+                max_output_tokens=max_output_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                presence_penalty=presence_penalty,
+                frequency_penalty=frequency_penalty,
+                seed=seed,
+                reasoning_effort=reasoning_effort,
+                extra_body=extra_body,
+                custom_id=custom_id,
+            )
+            return response
+        elif args.api == 'responses':
+            raise NotImplementedError()
+        else:
+            raise ValueError(f'Unknown API variant "{args.api}".')

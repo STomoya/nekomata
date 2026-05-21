@@ -60,7 +60,7 @@ class TestOpenAIClient:
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.openai.OpenAIClient._convert_output',
+            'nekomata.clients.providers.openai.OpenAIClient._convert_chat_completion_output',
             return_value=mock_convert_result,
         )
 
@@ -85,7 +85,7 @@ class TestOpenAIClient:
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.openai.OpenAIClient._convert_output',
+            'nekomata.clients.providers.openai.OpenAIClient._convert_chat_completion_output',
             return_value=mock_convert_result,
         )
 
@@ -122,7 +122,7 @@ class TestOpenAIClient:
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
         mock_convert_output = mocker.patch(
-            'nekomata.clients.providers.openai.OpenAIClient._convert_output',
+            'nekomata.clients.providers.openai.OpenAIClient._convert_chat_completion_output',
             return_value=mock_convert_result,
         )
 
@@ -175,10 +175,12 @@ class TestOpenAIClient:
         mock_parse_response = mocker.MagicMock(spec=ParsedChatCompletion)
 
         mock_convert_create = mocker.patch(
-            'nekomata.clients.providers.openai.OpenAIClient._convert_create_output', return_value='create'
+            'nekomata.clients.providers.openai.OpenAIClient._convert_chat_completion_create_output',
+            return_value='create',
         )
         mock_convert_parse = mocker.patch(
-            'nekomata.clients.providers.openai.OpenAIClient._convert_parse_output', return_value='parse'
+            'nekomata.clients.providers.openai.OpenAIClient._convert_chat_completion_parse_output',
+            return_value='parse',
         )
 
         mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
@@ -187,7 +189,7 @@ class TestOpenAIClient:
         created_at = time.time()
 
         # .chat.completions.create response conversion.
-        create_result = client._convert_output(mock_create_response, created_at)
+        create_result = client._convert_chat_completion_output(mock_create_response, created_at)
 
         mock_convert_create.assert_called_once_with(
             response=mock_create_response, created_at=created_at, custom_id=None
@@ -195,7 +197,7 @@ class TestOpenAIClient:
         assert create_result == 'create'
 
         # .chat.completions.parse response conversion.
-        parse_result = client._convert_output(mock_parse_response, created_at)
+        parse_result = client._convert_chat_completion_output(mock_parse_response, created_at)
 
         mock_convert_parse.assert_called_once_with(response=mock_parse_response, created_at=created_at, custom_id=None)
         assert parse_result == 'parse'
@@ -208,7 +210,7 @@ class TestOpenAIClient:
         mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
         client = OpenAIClient(api_key='test')
 
-        common_attrs = client._extract_common_attrs(mock_response)
+        common_attrs = client._extract_chat_completion_common_attrs(mock_response)
 
         assert common_attrs.content == 'Test content'
         assert common_attrs.reason == 'Test reasoning'
@@ -229,7 +231,7 @@ class TestOpenAIClient:
         mock_response.choices = []
 
         with pytest.raises(ValueError, match='Response object has an empty `choices` field'):
-            client._extract_common_attrs(mock_response)
+            client._extract_chat_completion_common_attrs(mock_response)
 
     @pytest.mark.anyio
     async def test_convert_create_output_success(self, mocker: MockerFixture, chat_completion_factory) -> None:
@@ -241,7 +243,7 @@ class TestOpenAIClient:
 
         created_at = time.time()
 
-        converted = client._convert_create_output(mock_response, created_at)
+        converted = client._convert_chat_completion_create_output(mock_response, created_at)
 
         assert converted.original == mock_response
         assert converted.parsed is None
@@ -267,7 +269,7 @@ class TestOpenAIClient:
 
         created_at = time.time()
 
-        converted = client._convert_parse_output(mock_response, created_at)
+        converted = client._convert_chat_completion_parse_output(mock_response, created_at)
 
         assert converted.original == mock_response
         assert converted.parsed == MyResponse(answer='hello')
@@ -288,7 +290,7 @@ class TestOpenAIClient:
         mock_instance.chat.completions.create = mocker.AsyncMock(return_value=mock_lib_response)
 
         mocker.patch(
-            'nekomata.clients.providers.openai.OpenAIClient._convert_output',
+            'nekomata.clients.providers.openai.OpenAIClient._convert_chat_completion_output',
             return_value=mocker.MagicMock(spec=ChatCompletionResponse),
         )
 

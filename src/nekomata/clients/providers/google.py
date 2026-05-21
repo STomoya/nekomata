@@ -10,6 +10,7 @@ from google.genai.types import GenerateContentResponse
 from pydantic import BaseModel
 
 from nekomata.clients.base import ClientABC
+from nekomata.types.google import GoogleArgs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger, get_utc_timestamp
 from nekomata.utils.uuid import create_uuid
@@ -63,7 +64,7 @@ class GoogleClient(ClientABC):
 
         self._initialized = True
 
-    def _convert_output(
+    def _convert_generate_content_output(
         self,
         response: GenerateContentResponse,
         created_at: float,
@@ -127,7 +128,7 @@ class GoogleClient(ClientABC):
         )
         return converted_response
 
-    async def _acompletion(
+    async def _generate_content(
         self,
         created_at: float,
         model: str,
@@ -142,10 +143,8 @@ class GoogleClient(ClientABC):
         frequency_penalty: float | None = None,
         seed: int | None = None,
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
-        extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
-        """Async completion API call."""
         thinking_config = types.ThinkingConfig(
             include_thoughts=reasoning_effort is not None,
             # NOTE(stomoya): genai package defines a case insensitive enum for this argument.
@@ -171,7 +170,9 @@ class GoogleClient(ClientABC):
             contents=prompt,
             config=generate_content_config,
         )
-        converted_response = self._convert_output(response=response, created_at=created_at, custom_id=custom_id)
+        converted_response = self._convert_generate_content_output(
+            response=response, created_at=created_at, custom_id=custom_id
+        )
 
         # Raise silently ignored ValidationError by re-validating response JSON schema.
         if (
@@ -186,3 +187,46 @@ class GoogleClient(ClientABC):
             response_format.model_validate_json(converted_response.content)
 
         return converted_response
+
+    async def _acompletion(
+        self,
+        created_at: float,
+        model: str,
+        prompt: str,
+        response_format: type[ResponseFormatT] | None = None,
+        system_prompt: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
+        seed: int | None = None,
+        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
+        args: GoogleArgs | None = None,
+    ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
+        """Async completion API call."""
+        if args is None or args.api == 'generateContent':
+            response = await self._generate_content(
+                created_at=created_at,
+                model=model,
+                prompt=prompt,
+                response_format=response_format,
+                system_prompt=system_prompt,
+                max_output_tokens=max_output_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                presence_penalty=presence_penalty,
+                frequency_penalty=frequency_penalty,
+                seed=seed,
+                reasoning_effort=reasoning_effort,
+                custom_id=custom_id,
+            )
+            return response
+        elif args.api == 'interactions':
+            raise NotImplementedError('Currently not supported')
+        else:
+            raise ValueError(f'Unknown API variant "{args.api}".')
