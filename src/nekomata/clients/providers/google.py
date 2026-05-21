@@ -3,14 +3,16 @@
 NOTE(stomoya): Currently, we have no plan to support the vertexai version.
 """
 
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, TypeVar, cast
 
 from google.genai import Client, types
+from google.genai._interactions import Omit
+from google.genai.interactions import GenerationConfig, Interaction, TextContent, ThoughtStep
 from google.genai.types import GenerateContentResponse
 from pydantic import BaseModel
 
 from nekomata.clients.base import ClientABC
-from nekomata.types.google import GoogleArgs
+from nekomata.types.google import GoogleArgs, InteractionsArgs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger, get_utc_timestamp
 from nekomata.utils.uuid import create_uuid
@@ -188,6 +190,121 @@ class GoogleClient(ClientABC):
 
         return converted_response
 
+    def _convert_interactions_output(
+        self,
+        response: Interaction,
+        created_at: float,
+        custom_id: str | None = None,
+        response_format: type[ResponseFormatT] | None = None,
+    ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
+        # NOTE(stomoya): I see no finish reason attr in the Interaction object (2026/05/21).
+        finish_reason = response.status
+        content_string = response.output_text
+
+        # parse json output.
+        if response_format is not None and issubclass(response_format, BaseModel):
+            parsed = response_format.model_validate_json(content_string)
+            parsed = cast(ResponseFormatT, parsed)
+
+        # Extract reason summary.
+        reason_string = ''
+        for step in response.steps:
+            if step.type == 'thought':
+                step = cast(ThoughtStep, step)
+                if step.summary is None:
+                    continue
+                reason_string += ''.join(content.text for content in step.summary if isinstance(content, TextContent))
+        # If thought is empty, return None instead of a empty string.
+        if not reason_string.strip():
+            reason_string = None
+
+        # Usage
+        usage = response.usage
+        total_tokens = input_tokens = output_tokens = cache_tokens = reason_tokens = None
+        if usage is not None:
+            total_tokens = usage.total_tokens
+            input_tokens = usage.total_input_tokens
+            output_tokens = usage.total_output_tokens
+            cache_tokens = usage.total_cached_tokens
+            reason_tokens = usage.total_thought_tokens
+
+        id = custom_id or create_uuid()
+        elapsed = get_utc_timestamp() - created_at
+        converted_response = ChatCompletionResponse(
+            id=id,
+            created_at=created_at,
+            elapsed=elapsed,
+            original=response,
+            content=content_string,
+            finish_reason=finish_reason,
+            reason=reason_string,
+            parsed=parsed,
+            total_tokens=total_tokens,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_tokens=cache_tokens,
+            reason_tokens=reason_tokens,
+        )
+        return converted_response
+
+    async def _interactions(
+        self,
+        created_at: float,
+        model: str,
+        prompt: str,
+        response_format: type[ResponseFormatT] | None = None,
+        system_prompt: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
+        seed: int | None = None,
+        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        custom_id: str | None = None,
+        args: InteractionsArgs | None = None,
+    ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
+        """Google interactions API call."""
+        args = args or InteractionsArgs()
+        omit = Omit()
+
+        # NOTE(stomoya): I do not see any top_k and penalty arguments. In addition to these, temperature and top_p are
+        #   deprecated, so maybe we might need to eliminate these on future versions.
+        config: GenerationConfig = GenerationConfig(
+            max_output_tokens=max_output_tokens,
+            seed=seed,
+            temperature=temperature,
+            top_p=top_p,
+            thinking_level=reasoning_effort,
+        )
+
+        response = await self._client.aio.interactions.create(
+            model=model,
+            input=prompt,
+            system_instruction=system_prompt or omit,
+            response_format=[
+                {
+                    'type': 'text',
+                    'mime_type': 'application/json',
+                    'schema': response_format,
+                }
+            ]
+            if response_format
+            else None,
+            generation_config=config.model_dump(),
+            # The new multi-turn conversation with server-side chat caching.
+            store=args.store,
+            previous_interaction_id=args.interaction_id or omit,
+        )
+
+        return self._convert_interactions_output(
+            response=response,
+            created_at=created_at,
+            custom_id=custom_id,
+            response_format=response_format,
+        )
+
     async def _acompletion(
         self,
         created_at: float,
@@ -227,6 +344,23 @@ class GoogleClient(ClientABC):
             )
             return response
         elif args.api == 'interactions':
-            raise NotImplementedError('Currently not supported')
+            response = await self._interactions(
+                created_at=created_at,
+                model=model,
+                prompt=prompt,
+                response_format=response_format,
+                system_prompt=system_prompt,
+                max_output_tokens=max_output_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                presence_penalty=presence_penalty,
+                frequency_penalty=frequency_penalty,
+                seed=seed,
+                reasoning_effort=reasoning_effort,
+                custom_id=custom_id,
+                args=args.interactions_args,
+            )
+            return response
         else:
             raise ValueError(f'Unknown API variant "{args.api}".')
