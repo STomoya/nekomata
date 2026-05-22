@@ -13,7 +13,7 @@ from openai.types.responses import ParsedResponse, Response, ResponseReasoningIt
 from nekomata.clients.base import ClientABC
 from nekomata.clients.utils import filter_none
 from nekomata.types.integrations import ChatCompletionResponse
-from nekomata.types.openai import OpenAIArgs, OpenAIChatCompletionCommonAttrs
+from nekomata.types.openai import OpenAIArgs, OpenAIChatCompletionCommonAttrs, ResponsesArgs
 from nekomata.utils import get_logger, get_utc_timestamp
 from nekomata.utils.uuid import create_uuid
 
@@ -309,8 +309,10 @@ class OpenAIClient(ClientABC):
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        args: ResponsesArgs | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """OpenAI responses API call."""
+        args = args or ResponsesArgs()
         if response_format is not None:
             response = await self._client.responses.parse(
                 model=model,
@@ -321,6 +323,8 @@ class OpenAIClient(ClientABC):
                 top_p=top_p,
                 text_format=response_format,
                 reasoning={'effort': reasoning_effort} if reasoning_effort else None,
+                store=args.store,
+                previous_response_id=args.response_id,
             )
             return self._convert_reponses_output(response=response, created_at=created_at, custom_id=custom_id)
         else:
@@ -332,6 +336,8 @@ class OpenAIClient(ClientABC):
                 instructions=system_prompt,
                 top_p=top_p,
                 reasoning={'effort': reasoning_effort} if reasoning_effort else None,
+                store=args.store,
+                previous_response_id=args.response_id,
             )
             return self._convert_reponses_output(response=response, created_at=created_at, custom_id=custom_id)
 
