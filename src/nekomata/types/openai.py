@@ -1,5 +1,6 @@
 """OpenAI specific types."""
 
+from dataclasses import dataclass
 from typing import Literal, NamedTuple
 
 from nekomata.types.clients import PackageSpecificArgs
@@ -25,6 +26,7 @@ class ResponsesArgs(NamedTuple):
     store: bool = True
 
 
+@dataclass
 class OpenAIArgs(PackageSpecificArgs):
     """OpenAI package specific API arguments."""
 
