@@ -1,5 +1,6 @@
 """OpenAI specific types."""
 
+from dataclasses import dataclass
 from typing import Literal, NamedTuple
 
 from nekomata.types.clients import PackageSpecificArgs
@@ -18,6 +19,7 @@ class OpenAIChatCompletionCommonAttrs(NamedTuple):
     reason_tokens: int | None
 
 
+@dataclass
 class OpenAIArgs(PackageSpecificArgs):
     """OpenAI package specific API arguments."""
 

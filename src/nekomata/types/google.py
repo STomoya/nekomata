@@ -1,5 +1,6 @@
 """Google client specific types."""
 
+from dataclasses import dataclass
 from typing import Literal, NamedTuple
 
 from nekomata.types.clients import PackageSpecificArgs
@@ -11,6 +12,7 @@ class InteractionsArgs(NamedTuple):
     interaction_id: str
 
 
+@dataclass
 class GoogleArgs(PackageSpecificArgs):
     """Google specific API arguments."""
 
