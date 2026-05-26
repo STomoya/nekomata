@@ -281,7 +281,7 @@ class OpenAIClient(ClientABC):
         )
         return converted_response
 
-    def _convert_reponses_output(
+    def _convert_responses_output(
         self,
         response: Response | ParsedResponse[ResponseFormatT],
         created_at: float,
@@ -326,7 +326,7 @@ class OpenAIClient(ClientABC):
                 store=args.store,
                 previous_response_id=args.response_id,
             )
-            return self._convert_reponses_output(response=response, created_at=created_at, custom_id=custom_id)
+            return self._convert_responses_output(response=response, created_at=created_at, custom_id=custom_id)
         else:
             response = await self._client.responses.create(
                 model=model,
@@ -339,7 +339,7 @@ class OpenAIClient(ClientABC):
                 store=args.store,
                 previous_response_id=args.response_id,
             )
-            return self._convert_reponses_output(response=response, created_at=created_at, custom_id=custom_id)
+            return self._convert_responses_output(response=response, created_at=created_at, custom_id=custom_id)
 
     async def _acompletion(
         self,
