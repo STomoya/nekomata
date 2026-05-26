@@ -1,6 +1,6 @@
 """OpenAI Client."""
 
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, TypeVar, cast
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
@@ -8,11 +8,12 @@ from openai.types.chat import (
     ChatCompletionMessageParam,
     ParsedChatCompletion,
 )
+from openai.types.responses import ParsedResponse, Response, ResponseReasoningItem
 
 from nekomata.clients.base import ClientABC
 from nekomata.clients.utils import filter_none
 from nekomata.types.integrations import ChatCompletionResponse
-from nekomata.types.openai import OpenAIArgs, OpenAIChatCompletionCommonAttrs
+from nekomata.types.openai import OpenAIArgs, OpenAIChatCompletionCommonAttrs, ResponsesArgs
 from nekomata.utils import get_logger, get_utc_timestamp
 from nekomata.utils.uuid import create_uuid
 
@@ -215,6 +216,131 @@ class OpenAIClient(ClientABC):
             )
             return self._convert_chat_completion_output(response=response, created_at=created_at, custom_id=custom_id)
 
+    def _extract_responses_common_attrs(self, response: Response) -> OpenAIChatCompletionCommonAttrs:
+        """Extract common attrs from the Response object."""
+        # NOTE(stomoya): I see no finish reason.
+        finish_reason = response.status
+        content_string = response.output_text
+
+        # Extract reason string from the contents.
+        reason_string = ''
+        for output in response.output:
+            if output.type == 'reasoning':
+                output = cast(ResponseReasoningItem, output)
+                reason_string_summary = ''.join(item.text for item in output.summary)
+                if output.content is not None:
+                    reason_string_content = ''.join(item.text for item in output.content)
+                else:
+                    reason_string_content = None
+                reason_string += reason_string_content or reason_string_summary
+        if not reason_string.strip():
+            reason_string = None
+
+        # Usage
+        usage = response.usage
+        total_tokens = input_tokens = output_tokens = cache_tokens = reason_tokens = None
+        if usage is not None:
+            total_tokens = usage.total_tokens
+            input_tokens = usage.input_tokens
+            output_tokens = usage.output_tokens
+            cache_tokens = usage.input_tokens_details.cached_tokens
+            reason_tokens = usage.output_tokens_details.reasoning_tokens
+
+        common_attrs = OpenAIChatCompletionCommonAttrs(
+            content=content_string,
+            reason=reason_string,
+            finish_reason=finish_reason,
+            total_tokens=total_tokens,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_tokens=cache_tokens,
+            reason_tokens=reason_tokens,
+        )
+        return common_attrs
+
+    def _convert_responses_create_output(
+        self, response: Response, created_at: float, custom_id: str | None = None
+    ) -> ChatCompletionResponse[None]:
+        common_attrs = self._extract_responses_common_attrs(response=response)
+        id = custom_id or create_uuid()
+        elapsed = get_utc_timestamp() - created_at
+        converted_response = ChatCompletionResponse[None](
+            id=id, created_at=created_at, elapsed=elapsed, original=response, **common_attrs._asdict()
+        )
+        return converted_response
+
+    def _convert_responses_parse_output(
+        self, response: ParsedResponse[ResponseFormatT], created_at: float, custom_id: str | None = None
+    ) -> ChatCompletionResponse[ResponseFormatT]:
+        common_attrs = self._extract_responses_common_attrs(response=response)
+        parsed = response.output_parsed
+        id = custom_id or create_uuid()
+        elapsed = get_utc_timestamp() - created_at
+        converted_response = ChatCompletionResponse[ResponseFormatT](
+            id=id, created_at=created_at, elapsed=elapsed, original=response, parsed=parsed, **common_attrs._asdict()
+        )
+        return converted_response
+
+    def _convert_responses_output(
+        self,
+        response: Response | ParsedResponse[ResponseFormatT],
+        created_at: float,
+        custom_id: str | None = None,
+    ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
+        if isinstance(response, ParsedResponse):
+            return self._convert_responses_parse_output(response=response, created_at=created_at, custom_id=custom_id)
+        else:
+            return self._convert_responses_create_output(response=response, created_at=created_at, custom_id=custom_id)
+
+    async def _responses(
+        self,
+        created_at: float,
+        model: str,
+        prompt: str,
+        response_format: type[ResponseFormatT] | None = None,
+        system_prompt: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
+        seed: int | None = None,
+        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        extra_body: dict[str, Any] | None = None,
+        custom_id: str | None = None,
+        args: ResponsesArgs | None = None,
+    ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
+        """OpenAI responses API call."""
+        args = args or ResponsesArgs()
+        if response_format is not None:
+            response = await self._client.responses.parse(
+                model=model,
+                input=prompt,
+                max_output_tokens=max_output_tokens,
+                temperature=temperature,
+                instructions=system_prompt,
+                top_p=top_p,
+                text_format=response_format,
+                reasoning={'effort': reasoning_effort} if reasoning_effort else None,
+                store=args.store,
+                previous_response_id=args.response_id,
+            )
+            return self._convert_responses_output(response=response, created_at=created_at, custom_id=custom_id)
+        else:
+            response = await self._client.responses.create(
+                model=model,
+                input=prompt,
+                max_output_tokens=max_output_tokens,
+                temperature=temperature,
+                instructions=system_prompt,
+                top_p=top_p,
+                reasoning={'effort': reasoning_effort} if reasoning_effort else None,
+                store=args.store,
+                previous_response_id=args.response_id,
+            )
+            return self._convert_responses_output(response=response, created_at=created_at, custom_id=custom_id)
+
     async def _acompletion(
         self,
         created_at: float,
@@ -255,6 +381,23 @@ class OpenAIClient(ClientABC):
             )
             return response
         elif args.api == 'responses':
-            raise NotImplementedError()
+            response = await self._responses(
+                created_at=created_at,
+                model=model,
+                prompt=prompt,
+                response_format=response_format,
+                system_prompt=system_prompt,
+                max_output_tokens=max_output_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                presence_penalty=presence_penalty,
+                frequency_penalty=frequency_penalty,
+                seed=seed,
+                reasoning_effort=reasoning_effort,
+                extra_body=extra_body,
+                custom_id=custom_id,
+            )
+            return response
         else:
             raise ValueError(f'Unknown API variant "{args.api}".')

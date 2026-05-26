@@ -1,5 +1,6 @@
 """Anthropic specific types."""
 
+from dataclasses import dataclass
 from typing import NamedTuple
 
 from nekomata.types.clients import PackageSpecificArgs
@@ -18,5 +19,6 @@ class AnthropicMessagesCommonAttrs(NamedTuple):
     reason_tokens: int | None
 
 
+@dataclass
 class AnthropicArgs(PackageSpecificArgs):
     """Anthropic specific API arguments."""
