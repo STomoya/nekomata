@@ -1,25 +1,112 @@
 """Tests for the OpenAI client."""
 
 import time
-from unittest.mock import ANY
+from collections.abc import Callable
+from unittest.mock import ANY, MagicMock
 
 import pytest
 from openai.types.chat import ChatCompletion, ParsedChatCompletion
+from openai.types.responses import ParsedResponse, Response
 from pydantic import BaseModel, ValidationError
 from pytest_mock import MockerFixture
 
 from nekomata.clients.providers.openai import OpenAIClient
 from nekomata.types.integrations import ChatCompletionResponse, ChatCompletionStatus
+from nekomata.types.openai import OpenAIArgs
+
+# --- Shared Test Artifacts ---
+
+
+class _MockStructuredResponse(BaseModel):
+    """Shared Pydantic model for testing structured output."""
+
+    answer: str
+
+
+def _get_validation_error() -> ValidationError:
+    """Generate a realistic ValidationError for retry tests."""
+    try:
+        _MockStructuredResponse(answer=1)  # ty: ignore[invalid-argument-type]
+    except ValidationError as e:
+        return e
+    raise RuntimeError('Expected ValidationError was not raised.')
+
+
+# --- Shared Fixtures ---
+
+
+@pytest.fixture
+def mock_async_openai_class(mocker: MockerFixture) -> MagicMock:
+    """Mock the AsyncOpenAI class globally to prevent HTTP client initialization."""
+    return mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
+
+
+@pytest.fixture
+def mock_async_openai(mock_async_openai_class: MagicMock) -> MagicMock:
+    """Provide the mocked instance of AsyncOpenAI."""
+    return mock_async_openai_class.return_value
+
+
+@pytest.fixture
+def client(mock_async_openai_class: MagicMock) -> OpenAIClient:
+    """Provide a standard, pre-initialized OpenAIClient."""
+    return OpenAIClient(api_key='test-key')
 
 
 class TestOpenAIClient:
     """Test suite for OpenAIClient."""
 
+    @pytest.mark.anyio
+    async def test_acompletion_dispatch(self, mocker: MockerFixture, client: OpenAIClient) -> None:
+        """Test acompletion dispatch by API configuration."""
+        mock_chat_completion_response = mocker.MagicMock()
+        mock_chat_completion = mocker.patch(
+            'nekomata.clients.providers.openai.OpenAIClient._chat_completion',
+            return_value=mock_chat_completion_response,
+        )
+        mock_responses_response = mocker.MagicMock()
+        mock_responses = mocker.patch(
+            'nekomata.clients.providers.openai.OpenAIClient._responses', return_value=mock_responses_response
+        )
+
+        completion_args = OpenAIArgs(api='chat_completions')
+        response = await client.acompletion(model='model', prompt='prompt', args=completion_args)
+
+        mock_chat_completion.assert_called_once()
+        # The responses should not be called.
+        mock_responses.assert_not_called()
+        assert response == mock_chat_completion_response
+
+        responses_args = OpenAIArgs(api='responses')
+        response = await client.acompletion(model='model', prompt='prompt', args=responses_args)
+
+        mock_responses.assert_called_once()
+        # chat completion should not be called (==1)
+        mock_chat_completion.assert_called_once()
+        assert response == mock_responses_response
+
+    @pytest.mark.anyio
+    async def test_aclose(self, mocker: MockerFixture, client: OpenAIClient) -> None:
+        """Test aclose() method."""
+        mock_aclose = mocker.patch.object(client._http_client, 'aclose', new_callable=mocker.AsyncMock)
+
+        await client.aclose()
+
+        mock_aclose.assert_called_once()
+
+    def test_initialized_property(self, client: OpenAIClient) -> None:
+        """Test the initialized property."""
+        assert client.initialized is True
+
+
+class TestOpenAIChatCompletion:
+    """Test suit for the _chat_completion API call of OpenAI SDK."""
+
     @pytest.fixture
-    def chat_completion_factory(self, mocker: MockerFixture):
+    def chat_completion_factory(self, mocker: MockerFixture) -> Callable[..., MagicMock]:
         """Create factory function of chat completion response object."""
 
-        def factory(response_cls=ChatCompletion):
+        def factory(response_cls: type = ChatCompletion) -> MagicMock:
             mock_response = mocker.MagicMock(spec=response_cls)
 
             mock_choice = mocker.MagicMock()
@@ -47,15 +134,13 @@ class TestOpenAIClient:
         return factory
 
     @pytest.mark.anyio
-    async def test_acompletion_success(self, mocker: MockerFixture) -> None:
+    async def test_acompletion_success(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
         """Test successful acompletion call."""
-        # Mock OpenAI client.
-        mock_lib_client_class = mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        mock_lib_client = mock_lib_client_class.return_value
-
         # Mock completion create.
         mock_lib_response = mocker.MagicMock(spec=ChatCompletion)
-        mock_lib_client.chat.completions.create = mocker.AsyncMock(return_value=mock_lib_response)
+        mock_async_openai.chat.completions.create = mocker.AsyncMock(return_value=mock_lib_response)
 
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
@@ -64,23 +149,20 @@ class TestOpenAIClient:
             return_value=mock_convert_result,
         )
 
-        client = OpenAIClient(api_key='test')
         response = await client.acompletion(model='model', prompt='prompt')
 
-        mock_lib_client.chat.completions.create.assert_called_once()
+        mock_async_openai.chat.completions.create.assert_called_once()
         mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
     @pytest.mark.anyio
-    async def test_acompletion_structured_output(self, mocker: MockerFixture) -> None:
+    async def test_acompletion_structured_output(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
         """Test successful acompletion call with structured output."""
-        # Mock OpenAI client.
-        mock_lib_client_class = mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        mock_lib_client = mock_lib_client_class.return_value
-
         # Mock completion parse.
         mock_lib_response = mocker.MagicMock(spec=ParsedChatCompletion)
-        mock_lib_client.chat.completions.parse = mocker.AsyncMock(return_value=mock_lib_response)
+        mock_async_openai.chat.completions.parse = mocker.AsyncMock(return_value=mock_lib_response)
 
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
@@ -89,35 +171,22 @@ class TestOpenAIClient:
             return_value=mock_convert_result,
         )
 
-        class MyResponse(BaseModel):
-            answer: str
+        response = await client.acompletion(model='model', prompt='prompt', response_format=_MockStructuredResponse)
 
-        client = OpenAIClient(api_key='test')
-        response = await client.acompletion(model='model', prompt='prompt', response_format=MyResponse)
-
-        mock_lib_client.chat.completions.parse.assert_called_once()
+        mock_async_openai.chat.completions.parse.assert_called_once()
         mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
     @pytest.mark.anyio
-    async def test_acompletion_structured_output_retry(self, mocker: MockerFixture) -> None:
+    async def test_acompletion_structured_output_retry(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
         """Test successful acompletion call with structured output."""
-        # Mock OpenAI client.
-        mock_lib_client_class = mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        mock_lib_client = mock_lib_client_class.return_value
-
-        class MyResponse(BaseModel):
-            answer: str
-
-        def _get_val_error():
-            try:
-                MyResponse(answer=1)  # ty: ignore[invalid-argument-type]
-            except ValidationError as e:
-                return e
-
         # Mock completion parse.
         mock_lib_response = mocker.MagicMock(spec=ParsedChatCompletion)
-        mock_lib_client.chat.completions.parse = mocker.AsyncMock(side_effect=[_get_val_error(), mock_lib_response])
+        mock_async_openai.chat.completions.parse = mocker.AsyncMock(
+            side_effect=[_get_validation_error(), mock_lib_response]
+        )
 
         # Mock response conversion.
         mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
@@ -126,24 +195,19 @@ class TestOpenAIClient:
             return_value=mock_convert_result,
         )
 
-        client = OpenAIClient(api_key='test')
         response = await client.acompletion(
-            model='model', prompt='prompt', response_format=MyResponse, max_model_retry=2
+            model='model', prompt='prompt', response_format=_MockStructuredResponse, max_model_retry=2
         )
 
-        assert mock_lib_client.chat.completions.parse.call_count == 2  # noqa: PLR2004
+        assert mock_async_openai.chat.completions.parse.call_count == 2  # noqa: PLR2004
         mock_convert_output.assert_called_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
     @pytest.mark.anyio
-    async def test_acompletion_failure(self, mocker: MockerFixture) -> None:
+    async def test_acompletion_failure(self, mock_async_openai: MagicMock, client: OpenAIClient) -> None:
         """Test failure during acompletion call."""
-        mock_openai_class = mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        mock_instance = mock_openai_class.return_value
+        mock_async_openai.chat.completions.create.side_effect = Exception('API Error')
 
-        mock_instance.chat.completions.create.side_effect = Exception('API Error')
-
-        client = OpenAIClient(api_key='test-key')
         response = await client.acompletion(model='gpt-4o', prompt='hello')
 
         assert response.status == ChatCompletionStatus.FAILED
@@ -151,25 +215,7 @@ class TestOpenAIClient:
         assert 'API Error' in response.fail_reason
 
     @pytest.mark.anyio
-    async def test_aclose(self, mocker: MockerFixture) -> None:
-        """Test aclose() method."""
-        mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-
-        client = OpenAIClient(api_key='test-key')
-        mock_aclose = mocker.patch.object(client._http_client, 'aclose', new_callable=mocker.AsyncMock)
-
-        await client.aclose()
-
-        mock_aclose.assert_called_once()
-
-    def test_initialized_property(self, mocker: MockerFixture) -> None:
-        """Test the initialized property."""
-        mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        client = OpenAIClient(api_key='test-key')
-        assert client.initialized is True
-
-    @pytest.mark.anyio
-    async def test_convert_output_dispatch(self, mocker: MockerFixture) -> None:
+    async def test_convert_output_dispatch(self, mocker: MockerFixture, client: OpenAIClient) -> None:
         """Test that convert_output dispatches convert method based on input response type."""
         mock_create_response = mocker.MagicMock(spec=ChatCompletion)
         mock_parse_response = mocker.MagicMock(spec=ParsedChatCompletion)
@@ -182,9 +228,6 @@ class TestOpenAIClient:
             'nekomata.clients.providers.openai.OpenAIClient._convert_chat_completion_parse_output',
             return_value='parse',
         )
-
-        mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        client = OpenAIClient(api_key='test-key')
 
         created_at = time.time()
 
@@ -203,13 +246,11 @@ class TestOpenAIClient:
         assert parse_result == 'parse'
 
     @pytest.mark.anyio
-    async def test_extract_common_attrs_success(self, mocker: MockerFixture, chat_completion_factory) -> None:
+    async def test_extract_common_attrs_success(
+        self, chat_completion_factory: Callable[..., MagicMock], client: OpenAIClient
+    ) -> None:
         """Test successful _extract_common_attrs call."""
         mock_response = chat_completion_factory()
-
-        mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        client = OpenAIClient(api_key='test')
-
         common_attrs = client._extract_chat_completion_common_attrs(mock_response)
 
         assert common_attrs.content == 'Test content'
@@ -222,11 +263,8 @@ class TestOpenAIClient:
         assert common_attrs.reason_tokens == 5  # noqa: PLR2004
 
     @pytest.mark.anyio
-    async def test_extract_common_attrs_empty_choices(self, mocker: MockerFixture) -> None:
+    async def test_extract_common_attrs_empty_choices(self, mocker: MockerFixture, client: OpenAIClient) -> None:
         """Test that _extract_common_attrs raises ValueError for empty choices."""
-        mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        client = OpenAIClient(api_key='test-key')
-
         mock_response = mocker.MagicMock()
         mock_response.choices = []
 
@@ -234,13 +272,11 @@ class TestOpenAIClient:
             client._extract_chat_completion_common_attrs(mock_response)
 
     @pytest.mark.anyio
-    async def test_convert_create_output_success(self, mocker: MockerFixture, chat_completion_factory) -> None:
+    async def test_convert_create_output_success(
+        self, chat_completion_factory: Callable[..., MagicMock], client: OpenAIClient
+    ) -> None:
         """Test successful _convert_create_output call."""
-        mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        client = OpenAIClient(api_key='test-key')
-
         mock_response = chat_completion_factory()
-
         created_at = time.time()
 
         converted = client._convert_chat_completion_create_output(mock_response, created_at)
@@ -256,23 +292,18 @@ class TestOpenAIClient:
         assert converted.reason_tokens == 5  # noqa: PLR2004
 
     @pytest.mark.anyio
-    async def test_convert_parse_output_success(self, mocker: MockerFixture, chat_completion_factory) -> None:
+    async def test_convert_parse_output_success(
+        self, chat_completion_factory: Callable[..., MagicMock], client: OpenAIClient
+    ) -> None:
         """Test successful _convert_parse_output call."""
-        mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        client = OpenAIClient(api_key='test-key')
-
-        class MyResponse(BaseModel):
-            answer: str
-
         mock_response = chat_completion_factory(ParsedChatCompletion)
-        mock_response.choices[0].message.parsed = MyResponse(answer='hello')
+        mock_response.choices[0].message.parsed = _MockStructuredResponse(answer='hello')
 
         created_at = time.time()
-
         converted = client._convert_chat_completion_parse_output(mock_response, created_at)
 
         assert converted.original == mock_response
-        assert converted.parsed == MyResponse(answer='hello')
+        assert converted.parsed == _MockStructuredResponse(answer='hello')
         # Assert propagation of common attrs
         assert converted.content == 'Test content'
         assert converted.reason == 'Test reasoning'
@@ -280,24 +311,22 @@ class TestOpenAIClient:
         assert converted.total_tokens == 100  # noqa: PLR2004
 
     @pytest.mark.anyio
-    async def test_acompletion_system_prompt_and_top_k(self, mocker: MockerFixture) -> None:
+    async def test_acompletion_system_prompt_and_top_k(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
         """Test that system_prompt and top_k are correctly handled."""
-        mock_openai_class = mocker.patch('nekomata.clients.providers.openai.AsyncOpenAI')
-        mock_instance = mock_openai_class.return_value
-
         # Mock response to avoid conversion error
         mock_lib_response = mocker.MagicMock(spec=ChatCompletion)
-        mock_instance.chat.completions.create = mocker.AsyncMock(return_value=mock_lib_response)
+        mock_async_openai.chat.completions.create = mocker.AsyncMock(return_value=mock_lib_response)
 
         mocker.patch(
             'nekomata.clients.providers.openai.OpenAIClient._convert_chat_completion_output',
             return_value=mocker.MagicMock(spec=ChatCompletionResponse),
         )
 
-        client = OpenAIClient(api_key='test-key')
         await client.acompletion(model='gpt-4o', prompt='hello', system_prompt='be helpful', top_k=50)
 
-        _args, kwargs = mock_instance.chat.completions.create.call_args
+        _args, kwargs = mock_async_openai.chat.completions.create.call_args
 
         # Verify messages
         messages = kwargs['messages']
@@ -307,3 +336,245 @@ class TestOpenAIClient:
 
         # Verify top_k in extra_body
         assert kwargs['extra_body'] == {'top_k': 50}
+
+
+class TestOpenAIResponses:
+    """Test responses API call of the OpenAI SDK."""
+
+    @pytest.fixture
+    def responses_factory(self, mocker: MockerFixture) -> Callable[..., MagicMock]:
+        """Create factory function of reponses response object."""
+
+        def factory(response_cls: type = Response, reason_has_content: bool = True) -> MagicMock:
+            mock_response = mocker.MagicMock(spec=response_cls)
+            mock_response.status = 'completed'
+            mock_response.output_text = 'content'
+
+            mock_response.output = [
+                mocker.MagicMock(
+                    type='reasoning',
+                    summary=[mocker.MagicMock(text='summary...')],
+                    content=[mocker.MagicMock(text='thinking...')] if reason_has_content else None,
+                ),
+            ]
+
+            mock_response.usage = mocker.MagicMock()
+            mock_response.usage.total_tokens = 20
+            mock_response.usage.input_tokens = 10
+            mock_response.usage.output_tokens = 10
+            mock_response.usage.input_tokens_details.cached_tokens = 5
+            mock_response.usage.output_tokens_details.reasoning_tokens = 5
+
+            return mock_response
+
+        return factory
+
+    @pytest.fixture
+    def responses_args(self) -> OpenAIArgs:
+        """Args for responses."""
+        return OpenAIArgs(api='responses')
+
+    @pytest.mark.anyio
+    async def test_acompletion_success(
+        self,
+        mocker: MockerFixture,
+        mock_async_openai: MagicMock,
+        client: OpenAIClient,
+        responses_args: OpenAIArgs,
+    ) -> None:
+        """Test successful acompletion call."""
+        # Mock completion create.
+        mock_lib_response = mocker.MagicMock(spec=Response)
+        mock_async_openai.responses.create = mocker.AsyncMock(return_value=mock_lib_response)
+
+        # Mock response conversion.
+        mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
+        mock_convert_output = mocker.patch(
+            'nekomata.clients.providers.openai.OpenAIClient._convert_responses_output',
+            return_value=mock_convert_result,
+        )
+
+        response = await client.acompletion(model='model', prompt='prompt', args=responses_args)
+
+        mock_async_openai.responses.create.assert_called_once()
+        mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
+        assert response == mock_convert_result
+
+    @pytest.mark.anyio
+    async def test_acompletion_structured_output(
+        self,
+        mocker: MockerFixture,
+        mock_async_openai: MagicMock,
+        client: OpenAIClient,
+        responses_args: OpenAIArgs,
+    ) -> None:
+        """Test successful acompletion call with structured output."""
+        # Mock completion create.
+        mock_lib_response = mocker.MagicMock(spec=Response)
+        mock_async_openai.responses.parse = mocker.AsyncMock(return_value=mock_lib_response)
+
+        # Mock response conversion.
+        mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
+        mock_convert_output = mocker.patch(
+            'nekomata.clients.providers.openai.OpenAIClient._convert_responses_output',
+            return_value=mock_convert_result,
+        )
+
+        response = await client.acompletion(
+            model='model', prompt='prompt', response_format=_MockStructuredResponse, args=responses_args
+        )
+
+        mock_async_openai.responses.parse.assert_called_once()
+        mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
+        assert response == mock_convert_result
+
+    @pytest.mark.anyio
+    async def test_acompletion_structured_output_retry(
+        self,
+        mocker: MockerFixture,
+        mock_async_openai: MagicMock,
+        client: OpenAIClient,
+        responses_args: OpenAIArgs,
+    ) -> None:
+        """Test successful acompletion call with structured output."""
+        # Mock completion create.
+        mock_lib_response = mocker.MagicMock(spec=Response)
+        mock_async_openai.responses.parse = mocker.AsyncMock(side_effect=[_get_validation_error(), mock_lib_response])
+
+        # Mock response conversion.
+        mock_convert_result = mocker.MagicMock(spec=ChatCompletionResponse)
+        mock_convert_output = mocker.patch(
+            'nekomata.clients.providers.openai.OpenAIClient._convert_responses_output',
+            return_value=mock_convert_result,
+        )
+
+        response = await client.acompletion(
+            model='model',
+            prompt='prompt',
+            response_format=_MockStructuredResponse,
+            max_model_retry=2,
+            args=responses_args,
+        )
+
+        assert mock_async_openai.responses.parse.call_count == 2  # noqa: PLR2004
+        mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
+        assert response == mock_convert_result
+
+    @pytest.mark.anyio
+    async def test_acompletion_failure(
+        self,
+        mock_async_openai: MagicMock,
+        client: OpenAIClient,
+        responses_args: OpenAIArgs,
+    ) -> None:
+        """Test failure during acompletion call."""
+        mock_async_openai.responses.create.side_effect = Exception('API Error')
+
+        response = await client.acompletion(model='gpt-4o', prompt='hello', args=responses_args)
+
+        assert response.status == ChatCompletionStatus.FAILED
+        assert response.fail_reason
+        assert 'API Error' in response.fail_reason
+
+    @pytest.mark.anyio
+    async def test_convert_output_dispatch(
+        self,
+        mocker: MockerFixture,
+        client: OpenAIClient,
+    ) -> None:
+        """Test that convert_output dispatches convert method based on input response type."""
+        mock_create_response = mocker.MagicMock(spec=Response)
+        mock_parse_response = mocker.MagicMock(spec=ParsedResponse)
+
+        mock_convert_create = mocker.patch(
+            'nekomata.clients.providers.openai.OpenAIClient._convert_responses_create_output',
+            return_value='create',
+        )
+        mock_convert_parse = mocker.patch(
+            'nekomata.clients.providers.openai.OpenAIClient._convert_responses_parse_output',
+            return_value='parse',
+        )
+
+        created_at = time.time()
+
+        # .chat.completions.create response conversion.
+        create_result = client._convert_responses_output(mock_create_response, created_at)
+
+        mock_convert_create.assert_called_once_with(
+            response=mock_create_response, created_at=created_at, custom_id=None
+        )
+        assert create_result == 'create'
+
+        # .chat.completions.parse response conversion.
+        parse_result = client._convert_responses_output(mock_parse_response, created_at)
+
+        mock_convert_parse.assert_called_once_with(response=mock_parse_response, created_at=created_at, custom_id=None)
+        assert parse_result == 'parse'
+
+    @pytest.mark.anyio
+    async def test_extract_common_attrs_success(
+        self, responses_factory: Callable[..., MagicMock], client: OpenAIClient
+    ) -> None:
+        """Test successful _extract_common_attrs call."""
+        mock_response = responses_factory()
+        common_attrs = client._extract_responses_common_attrs(mock_response)
+
+        assert common_attrs.content == 'content'
+        assert common_attrs.reason == 'thinking...'
+        assert common_attrs.finish_reason == 'completed'
+        assert common_attrs.total_tokens == 20  # noqa: PLR2004
+        assert common_attrs.input_tokens == 10  # noqa: PLR2004
+        assert common_attrs.output_tokens == 10  # noqa: PLR2004
+        assert common_attrs.cache_tokens == 5  # noqa: PLR2004
+        assert common_attrs.reason_tokens == 5  # noqa: PLR2004
+
+    @pytest.mark.anyio
+    async def test_extract_common_attrs_no_reasoning(
+        self, responses_factory: Callable[..., MagicMock], client: OpenAIClient
+    ) -> None:
+        """Test successful _extract_common_attrs call."""
+        mock_response = responses_factory()
+        mock_response.output = []
+
+        common_attrs = client._extract_responses_common_attrs(mock_response)
+
+        assert common_attrs.reason is None
+
+    @pytest.mark.anyio
+    async def test_convert_create_output_success(
+        self, responses_factory: Callable[..., MagicMock], client: OpenAIClient
+    ) -> None:
+        """Test successful _convert_create_output call."""
+        mock_response = responses_factory()
+        created_at = time.time()
+
+        converted = client._convert_responses_create_output(mock_response, created_at)
+
+        assert converted.original == mock_response
+        assert converted.parsed is None
+        # Assert propagation of common attrs
+        assert converted.content == 'content'
+        assert converted.reason == 'thinking...'
+        assert converted.finish_reason == 'completed'
+        assert converted.total_tokens == 20  # noqa: PLR2004
+        assert converted.input_tokens == 10  # noqa: PLR2004
+        assert converted.output_tokens == 10  # noqa: PLR2004
+
+    @pytest.mark.anyio
+    async def test_convert_parse_output_success(
+        self, responses_factory: Callable[..., MagicMock], client: OpenAIClient
+    ) -> None:
+        """Test successful _convert_parse_output call."""
+        mock_response = responses_factory(ParsedResponse)
+        mock_response.output_parsed = _MockStructuredResponse(answer='hello')
+
+        created_at = time.time()
+        converted = client._convert_responses_parse_output(mock_response, created_at)
+
+        assert converted.original == mock_response
+        assert converted.parsed == _MockStructuredResponse(answer='hello')
+        # Assert propagation of common attrs
+        assert converted.content == 'content'
+        assert converted.reason == 'thinking...'
+        assert converted.finish_reason == 'completed'
+        assert converted.total_tokens == 20  # noqa: PLR2004
