@@ -202,6 +202,7 @@ class GoogleClient(ClientABC):
         content_string = response.output_text
 
         # parse json output.
+        parsed = None
         if response_format is not None and issubclass(response_format, BaseModel):
             parsed = response_format.model_validate_json(content_string)
             parsed = cast(ResponseFormatT, parsed)
@@ -287,12 +288,12 @@ class GoogleClient(ClientABC):
                 {
                     'type': 'text',
                     'mime_type': 'application/json',
-                    'schema': response_format,
+                    'schema': response_format.model_json_schema(),
                 }
             ]
-            if response_format
-            else None,
-            generation_config=config.model_dump(),
+            if response_format and issubclass(response_format, BaseModel)
+            else omit,
+            generation_config=config.model_dump(exclude_none=True),
             # The new multi-turn conversation with server-side chat caching.
             store=args.store,
             previous_interaction_id=args.interaction_id or omit,
