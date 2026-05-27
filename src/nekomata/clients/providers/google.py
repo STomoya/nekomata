@@ -363,5 +363,5 @@ class GoogleClient(ClientABC):
                 args=args.interactions_args,
             )
             return response
-        else:
+        else:  # pragma: no cover
             raise ValueError(f'Unknown API variant "{args.api}".')
