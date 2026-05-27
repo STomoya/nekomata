@@ -9,7 +9,8 @@ from nekomata.types.clients import PackageSpecificArgs
 class InteractionsArgs(NamedTuple):
     """Arguments for the interactions API."""
 
-    interaction_id: str
+    interaction_id: str | None = None
+    store: bool = True
 
 
 @dataclass
