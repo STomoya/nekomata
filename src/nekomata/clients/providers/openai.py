@@ -243,8 +243,10 @@ class OpenAIClient(ClientABC):
             total_tokens = usage.total_tokens
             input_tokens = usage.input_tokens
             output_tokens = usage.output_tokens
-            cache_tokens = usage.input_tokens_details.cached_tokens
-            reason_tokens = usage.output_tokens_details.reasoning_tokens
+            if usage.input_tokens_details is not None:
+                cache_tokens = usage.input_tokens_details.cached_tokens
+            if usage.output_tokens_details is not None:
+                reason_tokens = usage.output_tokens_details.reasoning_tokens
 
         common_attrs = OpenAIChatCompletionCommonAttrs(
             content=content_string,
