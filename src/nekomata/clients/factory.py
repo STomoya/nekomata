@@ -6,7 +6,7 @@ from nekomata.clients.base import ClientABC
 from nekomata.clients.providers.anthropic import AnthropicClient
 from nekomata.clients.providers.google import GoogleClient
 from nekomata.clients.providers.openai import OpenAIClient
-from nekomata.clients.registry import get_client_entrypoint
+from nekomata.clients.registry import get_client_entrypoint, list_client_keys
 from nekomata.const import SUPPORTED_PROVIDERS
 from nekomata.utils import get_logger
 
@@ -84,8 +84,10 @@ def create_client(
     ssl_verify: str | bool = True,
 ) -> Client:
     """Create client by provider name."""
-    if provider not in SUPPORTED_PROVIDERS:
-        err_msg = f'Unsupport provider "{provider}". Must be one of {SUPPORTED_PROVIDERS}'
+    if provider not in SUPPORTED_PROVIDERS and provider not in list_client_keys():
+        err_msg = (
+            f'Unsupport provider "{provider}". Must be one of {SUPPORTED_PROVIDERS} or a user registered client name.'
+        )
         raise ValueError(err_msg)
 
     logger.debug(f"Creating LLM client for provider: '{provider}' (base_url: {base_url})")
@@ -135,6 +137,6 @@ def create_client(
                 timeout=timeout,
                 ssl_verify=ssl_verify,
             )
-        except Exception as e:
-            err_msg = f'Unknown provider "{provider}". Must be one of {SUPPORTED_PROVIDERS}'
+        except Exception as e:  # pragma: no cover  # Never reached.
+            err_msg = f'Unknown provider "{provider}"'
             raise ValueError(err_msg) from e
