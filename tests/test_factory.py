@@ -63,7 +63,7 @@ class TestClientFactory:
         """Test that the factory raises ValueError for unsupported providers."""
         with pytest.raises(ValueError, match='Unsupport provider'):
             # Casting to ignore type warning for test case
-            create_client(provider='unsupported')  # type: ignore
+            create_client(provider='unsupported')
 
     def test_supported_providers_constant(self) -> None:
         """Test that SUPPORTED_PROVIDERS contains the expected values."""

@@ -11,12 +11,14 @@ from pydantic import ValidationError
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from nekomata.clients.utils import create_failed_response
+from nekomata.types.clients import PackageSpecificArgs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger
 from nekomata.utils.misc import get_utc_timestamp
 
 ResponseT = TypeVar('ResponseT')
 ResponseFormatT = TypeVar('ResponseFormatT')
+PackageArgsT = TypeVar('PackageArgsT', bound=PackageSpecificArgs)
 
 logger = get_logger(__name__)
 
@@ -105,6 +107,7 @@ class ClientABC(ABC):
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     @overload
@@ -125,6 +128,7 @@ class ClientABC(ABC):
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[None]: ...
 
     @abstractmethod
@@ -145,6 +149,7 @@ class ClientABC(ABC):
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Actual async API call implementation."""
         raise NotImplementedError
@@ -177,6 +182,7 @@ class ClientABC(ABC):
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[None]: ...
 
     # Overload for structured output LLM api calls.
@@ -198,6 +204,7 @@ class ClientABC(ABC):
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     async def acompletion(
@@ -217,6 +224,7 @@ class ClientABC(ABC):
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Async completion API call.
 
@@ -240,6 +248,7 @@ class ClientABC(ABC):
                 Defaults to None.
             max_model_retry (int, optional): Maximum number of retries when failed to validate generated content to
                 pydantic model. Defaults to 1.
+            args (PackageArgsT | None, optional): Package specific arguments. Defaults to None
 
         """
         logger.debug(f'Entering semaphore for model: {model}')
@@ -271,6 +280,7 @@ class ClientABC(ABC):
                             reasoning_effort=reasoning_effort,
                             extra_body=extra_body,
                             custom_id=custom_id,
+                            args=args,
                         )
                     if (
                         hasattr(attempt.retry_state.outcome, 'failed')

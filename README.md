@@ -192,15 +192,22 @@ with AsyncLLMDispatcher() as dispatcher:
 
 ## Custom Clients
 
-Implement your own async client class. See the [abstract class](src/nekomata/clients/base.py) for more details.
+Implement your own async client class. See the [abstract class](src/nekomata/clients/base.py) and [actual client implementations](src/nekomata/clients/providers/openai.py) for more details.
 
 ```python
+from typing import Any, Literal, TypeVar
+
 from llm_package_of_your_choice import AsyncClient
 
 from nekomata import register_client
 from nekomata.clients.base import ClientABC
-from nekomata.utils import get_utc_timestamp, create_uuid
 from nekomata.types import ChatCompletionStatus
+from nekomata.types.clients import PackageSpecificArgs
+from nekomata.types.integrations import ChatCompletionResponse
+from nekomata.utils import create_uuid, get_utc_timestamp
+
+ResponseFormatT = TypeVar('ResponseFormatT')
+PackageArgsT = TypeVar('PackageArgsT', bound=PackageSpecificArgs)
 
 # Register your client to the package using the decorator.
 # This will make your client implementation be used inside the dispatcher
@@ -255,6 +262,7 @@ class MyClient(ClientABC):
         reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         # You only need to implement the inference and conversion to the ChatCompletionResponse object.
         # Structured output retrying, errors, and maximum concurrent requests are already done for you.
