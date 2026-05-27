@@ -122,7 +122,7 @@ def create_client(
             timeout=timeout,
             ssl_verify=ssl_verify,
         )
-    else:  # pragma: no cover # Never reached. Making type checker happy.
+    else:
         try:
             ClientCls = get_client_entrypoint(provider)
             return ClientCls(
