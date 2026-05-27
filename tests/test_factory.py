@@ -2,7 +2,10 @@
 
 import pytest
 
+from nekomata import register_client
+from nekomata.clients.base import ClientABC
 from nekomata.clients.factory import SUPPORTED_PROVIDERS, create_client
+from nekomata.clients.registry import CLIENT_REGISTRY
 
 
 class TestClientFactory:
@@ -69,3 +72,25 @@ class TestClientFactory:
         """Test that SUPPORTED_PROVIDERS contains the expected values."""
         expected = {'openai', 'google', 'anthropic'}
         assert expected == SUPPORTED_PROVIDERS
+
+    # NOTE(stomoya): This test is related to `test_registry.py`.
+
+    @pytest.fixture
+    def reset_registry(self):
+        """Reset registry."""
+        CLIENT_REGISTRY._registry.clear()
+
+    def test_registered_clients(self, reset_registry) -> None:
+        """Test registered clients are created."""
+
+        @register_client(name='myclient')
+        class MyClient(ClientABC):
+            """My Client."""
+
+            # dummy implementation of the abstractmethod
+            async def _acompletion(self):  # ty: ignore[invalid-method-override]
+                pass
+
+        client = create_client('myclient')
+
+        assert isinstance(client, MyClient)
