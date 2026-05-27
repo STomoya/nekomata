@@ -399,5 +399,5 @@ class OpenAIClient(ClientABC):
                 custom_id=custom_id,
             )
             return response
-        else:
+        else:  # pragma: no cover
             raise ValueError(f'Unknown API variant "{args.api}".')

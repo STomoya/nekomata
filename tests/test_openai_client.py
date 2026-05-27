@@ -529,6 +529,17 @@ class TestOpenAIResponses:
         assert common_attrs.reason_tokens == 5  # noqa: PLR2004
 
     @pytest.mark.anyio
+    async def test_extract_common_attrs_reason_summary(
+        self, responses_factory: Callable[..., MagicMock], client: OpenAIClient
+    ) -> None:
+        """Test successful _extract_common_attrs call with only reason summaries."""
+        mock_response = responses_factory()
+        mock_response.output[0].content = None
+        common_attrs = client._extract_responses_common_attrs(mock_response)
+
+        assert common_attrs.reason == 'summary...'
+
+    @pytest.mark.anyio
     async def test_extract_common_attrs_no_reasoning(
         self, responses_factory: Callable[..., MagicMock], client: OpenAIClient
     ) -> None:
