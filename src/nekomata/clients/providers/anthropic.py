@@ -1,6 +1,6 @@
 """Anthropic Client."""
 
-from typing import Any, Literal, TypeVar
+from typing import Any, TypeVar
 
 from anthropic import AsyncAnthropic, Omit
 from anthropic.types import (
@@ -154,7 +154,7 @@ class AnthropicClient(ClientABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         args: AnthropicArgs | None = None,
@@ -168,13 +168,13 @@ class AnthropicClient(ClientABC):
             max_output_tokens = 4096
 
         thinking = output_config = None
-        if reasoning_effort == 'minimal':
-            # TODO: warn unsupported effort 'minimal' will fallback to disabled.
-            pass
-        elif reasoning_effort:
+        if reasoning_effort:
             # Maybe support the deprecated ThinkingConfigEnabledParam for older Claude models?
             thinking: ThinkingConfigParam = ThinkingConfigAdaptiveParam(type='adaptive', display='summarized')
-            output_config: OutputConfigParam = OutputConfigParam(effort=reasoning_effort)
+            output_config: OutputConfigParam = OutputConfigParam(
+                # NOTE(stomoya): Let the package or API raise the unsupported reasoning_effort value
+                effort=reasoning_effort,  # ty: ignore[invalid-argument-type]
+            )
 
         # TODO: Log deprecated/unsupport parameters if set.
         #   deprecated: temperature, top_p, top_k

@@ -1,6 +1,6 @@
 """OpenAI Client."""
 
-from typing import Any, Literal, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
@@ -167,7 +167,7 @@ class OpenAIClient(ClientABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
@@ -186,7 +186,7 @@ class OpenAIClient(ClientABC):
         openai_unsupported_kwargs = filter_none(extra_body) or None
 
         if response_format is None:
-            response = await self._client.chat.completions.create(
+            response = await self._client.chat.completions.create(  # ty: ignore[ no-matching-overload]
                 model=model,
                 messages=messages,
                 stream=False,
@@ -211,7 +211,8 @@ class OpenAIClient(ClientABC):
                 top_p=top_p,
                 temperature=temperature,
                 seed=seed,
-                reasoning_effort=reasoning_effort,
+                # NOTE(stomoya): Let the package or API raise the unsupported reasoning_effort value
+                reasoning_effort=reasoning_effort,  # ty: ignore[invalid-argument-type]
                 extra_body=openai_unsupported_kwargs,
             )
             return self._convert_chat_completion_output(response=response, created_at=created_at, custom_id=custom_id)
@@ -308,7 +309,7 @@ class OpenAIClient(ClientABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         args: ResponsesArgs | None = None,
@@ -324,7 +325,7 @@ class OpenAIClient(ClientABC):
                 instructions=system_prompt,
                 top_p=top_p,
                 text_format=response_format,
-                reasoning={'effort': reasoning_effort} if reasoning_effort else None,
+                reasoning={'effort': reasoning_effort} if reasoning_effort else None,  # ty: ignore[invalid-argument-type]
                 store=args.store,
                 previous_response_id=args.response_id,
             )
@@ -337,7 +338,7 @@ class OpenAIClient(ClientABC):
                 temperature=temperature,
                 instructions=system_prompt,
                 top_p=top_p,
-                reasoning={'effort': reasoning_effort} if reasoning_effort else None,
+                reasoning={'effort': reasoning_effort} if reasoning_effort else None,  # ty: ignore[invalid-argument-type]
                 store=args.store,
                 previous_response_id=args.response_id,
             )
@@ -357,7 +358,7 @@ class OpenAIClient(ClientABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         args: OpenAIArgs | None = None,
