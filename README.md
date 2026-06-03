@@ -259,7 +259,7 @@ class MyClient(ClientABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         args: PackageArgsT | None = None,
