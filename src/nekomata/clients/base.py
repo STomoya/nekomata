@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from contextlib import nullcontext
 from json import JSONDecodeError
-from typing import Any, Literal, TypeVar, overload
+from typing import Any, TypeVar, overload
 
 import anyio
 import httpx
@@ -104,7 +104,7 @@ class ClientABC(ABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         args: PackageArgsT | None = None,
@@ -125,7 +125,7 @@ class ClientABC(ABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         args: PackageArgsT | None = None,
@@ -146,7 +146,7 @@ class ClientABC(ABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         args: PackageArgsT | None = None,
@@ -178,7 +178,7 @@ class ClientABC(ABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
@@ -200,7 +200,7 @@ class ClientABC(ABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
@@ -220,7 +220,7 @@ class ClientABC(ABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
@@ -241,8 +241,7 @@ class ClientABC(ABC):
             seed (int | None): [Sampling] Random seed. Defaults to None.
             response_format (type[BaseModel] | None, optional): JSON response format defined as a pydantic model.
                 Defaults to None.
-            reasoning_effort (Literal['high', 'medium', 'low', 'minimal'] | None, optional): Reasoning effort.
-                Defaults to None.
+            reasoning_effort (str | None, optional): Reasoning effort. Defaults to None.
             extra_body (dict[str, Any] | None, optional): Extra body.
             custom_id (str | None, optional): Custom ID. This value will overwrite the response object's ID field.
                 Defaults to None.

@@ -3,7 +3,7 @@
 NOTE(stomoya): Currently, we have no plan to support the vertexai version.
 """
 
-from typing import Any, Literal, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from google.genai import Client, types
 from google.genai._interactions import Omit
@@ -144,13 +144,12 @@ class GoogleClient(ClientABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         custom_id: str | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         thinking_config = types.ThinkingConfig(
             include_thoughts=reasoning_effort is not None,
-            # NOTE(stomoya): genai package defines a case insensitive enum for this argument.
-            #       We simply make the enum raise the error for us.
+            # NOTE(stomoya): Let the package or API raise the unsupported reasoning_effort value
             thinking_level=reasoning_effort,  # ty: ignore[invalid-argument-type]
         )
         generate_content_config = types.GenerateContentConfig(
@@ -262,7 +261,7 @@ class GoogleClient(ClientABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         custom_id: str | None = None,
         args: InteractionsArgs | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
@@ -277,7 +276,8 @@ class GoogleClient(ClientABC):
             seed=seed,
             temperature=temperature,
             top_p=top_p,
-            thinking_level=reasoning_effort,
+            # NOTE(stomoya): Let the package or API raise the unsupported reasoning_effort value
+            thinking_level=reasoning_effort,  # ty: ignore[invalid-argument-type]
         )
 
         response = await self._client.aio.interactions.create(
@@ -320,7 +320,7 @@ class GoogleClient(ClientABC):
         presence_penalty: float | None = None,
         frequency_penalty: float | None = None,
         seed: int | None = None,
-        reasoning_effort: Literal['high', 'medium', 'low', 'minimal'] | None = None,
+        reasoning_effort: str | None = None,
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         args: GoogleArgs | None = None,

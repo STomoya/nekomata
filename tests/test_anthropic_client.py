@@ -4,7 +4,6 @@ import time
 from unittest.mock import ANY
 
 import pytest
-from anthropic import Omit
 from anthropic.types import Message, ParsedMessage, TextBlock, ThinkingBlock
 from pydantic import BaseModel
 from pytest_mock import MockerFixture
@@ -260,9 +259,9 @@ class TestAnthropicClient:
         assert kwargs['thinking']['type'] == 'adaptive'
         assert kwargs['output_config']['effort'] == 'high'
 
-        # Remove reasoning on unsupported 'minimal' effort.
-        await client.acompletion(model='c', prompt='p', reasoning_effort='minimal')
+        # Check if a reasoning effort unsupported by other providers is valid for anthropic client.
+        await client.acompletion(model='c', prompt='p', reasoning_effort='max')
 
         _args, kwargs = mock_instance.messages.create.call_args
-        assert isinstance(kwargs['thinking'], Omit)
-        assert isinstance(kwargs['output_config'], Omit)
+        assert kwargs['thinking']['type'] == 'adaptive'
+        assert kwargs['output_config']['effort'] == 'max'
