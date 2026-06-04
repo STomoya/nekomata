@@ -26,7 +26,7 @@ class AnthropicBatchAPIPlugin(BatchAPIPlugin):
         response_format: type[Any] | list[type[Any]] | None = None,
         reasoning_effort: str | list[str] | None = None,
         custom_id: str | list[str] | None = None,
-        mode: Literal['file', 'inline'] = 'file',
+        mode: Literal['file', 'inline'] = 'inline',
     ) -> Any:
         """Create a new message batch.
 
@@ -41,6 +41,10 @@ class AnthropicBatchAPIPlugin(BatchAPIPlugin):
             mode (Literal['file', 'inline']): Batch mode (ignored for Anthropic).
 
         """
+        if mode == 'file':
+            msg = 'Anthropic only supports inline batch requests. Proceeding with "inline".'
+            logger.warning(msg)
+
         expanded = validate_and_expand_batch_args(
             prompt=prompt,
             system_prompt=system_prompt,

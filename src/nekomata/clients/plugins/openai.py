@@ -44,6 +44,10 @@ class OpenAIBatchAPIPlugin(BatchAPIPlugin):
             mode (Literal['file', 'inline']): Batch mode (ignored for OpenAI).
 
         """
+        if mode == 'inline':
+            msg = 'OpenAI only supports Files API-based batch requests. Proceeding with "file".'
+            logger.warning(msg)
+
         expanded = validate_and_expand_batch_args(
             prompt=prompt,
             system_prompt=system_prompt,
