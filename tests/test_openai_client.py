@@ -199,7 +199,7 @@ class TestOpenAIChatCompletion:
             model='model', prompt='prompt', response_format=_MockStructuredResponse, max_model_retry=2
         )
 
-        assert mock_async_openai.chat.completions.parse.call_count == 2  # noqa: PLR2004
+        assert mock_async_openai.chat.completions.parse.call_count == 2
         mock_convert_output.assert_called_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
@@ -256,11 +256,11 @@ class TestOpenAIChatCompletion:
         assert common_attrs.content == 'Test content'
         assert common_attrs.reason == 'Test reasoning'
         assert common_attrs.finish_reason == 'stop'
-        assert common_attrs.total_tokens == 100  # noqa: PLR2004
-        assert common_attrs.input_tokens == 40  # noqa: PLR2004
-        assert common_attrs.output_tokens == 60  # noqa: PLR2004
-        assert common_attrs.cache_tokens == 10  # noqa: PLR2004
-        assert common_attrs.reason_tokens == 5  # noqa: PLR2004
+        assert common_attrs.total_tokens == 100
+        assert common_attrs.input_tokens == 40
+        assert common_attrs.output_tokens == 60
+        assert common_attrs.cache_tokens == 10
+        assert common_attrs.reason_tokens == 5
 
     @pytest.mark.anyio
     async def test_extract_common_attrs_empty_choices(self, mocker: MockerFixture, client: OpenAIClient) -> None:
@@ -287,9 +287,9 @@ class TestOpenAIChatCompletion:
         assert converted.content == 'Test content'
         assert converted.reason == 'Test reasoning'
         assert converted.finish_reason == 'stop'
-        assert converted.total_tokens == 100  # noqa: PLR2004
-        assert converted.cache_tokens == 10  # noqa: PLR2004
-        assert converted.reason_tokens == 5  # noqa: PLR2004
+        assert converted.total_tokens == 100
+        assert converted.cache_tokens == 10
+        assert converted.reason_tokens == 5
 
     @pytest.mark.anyio
     async def test_convert_parse_output_success(
@@ -308,7 +308,7 @@ class TestOpenAIChatCompletion:
         assert converted.content == 'Test content'
         assert converted.reason == 'Test reasoning'
         assert converted.finish_reason == 'stop'
-        assert converted.total_tokens == 100  # noqa: PLR2004
+        assert converted.total_tokens == 100
 
     @pytest.mark.anyio
     async def test_acompletion_system_prompt_and_top_k(
@@ -330,7 +330,7 @@ class TestOpenAIChatCompletion:
 
         # Verify messages
         messages = kwargs['messages']
-        assert len(messages) == 2  # noqa: PLR2004
+        assert len(messages) == 2
         assert messages[0] == {'role': 'system', 'content': 'be helpful'}
         assert messages[1] == {'role': 'user', 'content': 'hello'}
 
@@ -456,7 +456,7 @@ class TestOpenAIResponses:
             args=responses_args,
         )
 
-        assert mock_async_openai.responses.parse.call_count == 2  # noqa: PLR2004
+        assert mock_async_openai.responses.parse.call_count == 2
         mock_convert_output.assert_called_once_with(response=mock_lib_response, created_at=ANY, custom_id=None)
         assert response == mock_convert_result
 
@@ -522,11 +522,11 @@ class TestOpenAIResponses:
         assert common_attrs.content == 'content'
         assert common_attrs.reason == 'thinking...'
         assert common_attrs.finish_reason == 'completed'
-        assert common_attrs.total_tokens == 20  # noqa: PLR2004
-        assert common_attrs.input_tokens == 10  # noqa: PLR2004
-        assert common_attrs.output_tokens == 10  # noqa: PLR2004
-        assert common_attrs.cache_tokens == 5  # noqa: PLR2004
-        assert common_attrs.reason_tokens == 5  # noqa: PLR2004
+        assert common_attrs.total_tokens == 20
+        assert common_attrs.input_tokens == 10
+        assert common_attrs.output_tokens == 10
+        assert common_attrs.cache_tokens == 5
+        assert common_attrs.reason_tokens == 5
 
     @pytest.mark.anyio
     async def test_extract_common_attrs_reason_summary(
@@ -567,9 +567,9 @@ class TestOpenAIResponses:
         assert converted.content == 'content'
         assert converted.reason == 'thinking...'
         assert converted.finish_reason == 'completed'
-        assert converted.total_tokens == 20  # noqa: PLR2004
-        assert converted.input_tokens == 10  # noqa: PLR2004
-        assert converted.output_tokens == 10  # noqa: PLR2004
+        assert converted.total_tokens == 20
+        assert converted.input_tokens == 10
+        assert converted.output_tokens == 10
 
     @pytest.mark.anyio
     async def test_convert_parse_output_success(
@@ -588,4 +588,149 @@ class TestOpenAIResponses:
         assert converted.content == 'content'
         assert converted.reason == 'thinking...'
         assert converted.finish_reason == 'completed'
-        assert converted.total_tokens == 20  # noqa: PLR2004
+        assert converted.total_tokens == 20
+
+
+class TestOpenAIBatchAPI:
+    """Test suite for OpenAI Batch API operations."""
+
+    @pytest.mark.anyio
+    async def test_acreate_batch(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
+        """Test acreate_batch call with single custom_id."""
+        mock_upload = mock_async_openai.files.create = mocker.AsyncMock()
+        mock_upload.return_value.id = 'file-id'
+        mock_create = mock_async_openai.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.acreate_batch(
+            model='gpt-4o',
+            prompt=['hello', 'world'],
+            system_prompt='sys prompt',
+            max_output_tokens=100,
+            reasoning_effort='medium',
+            response_format=_MockStructuredResponse,
+            custom_id='my-custom-id',
+        )
+
+        mock_upload.assert_called_once()
+        mock_create.assert_called_once_with(
+            completion_window='24h',
+            endpoint='/v1/chat/completions',
+            input_file_id='file-id',
+        )
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_with_custom_id_list(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
+        """Test acreate_batch call with a list of custom_ids."""
+        mock_upload = mock_async_openai.files.create = mocker.AsyncMock()
+        mock_upload.return_value.id = 'file-id'
+        mock_create = mock_async_openai.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.acreate_batch(
+            model='gpt-4o',
+            prompt=['hello', 'world'],
+            custom_id=['id-1', 'id-2'],
+        )
+
+        mock_upload.assert_called_once()
+        mock_create.assert_called_once_with(
+            completion_window='24h',
+            endpoint='/v1/chat/completions',
+            input_file_id='file-id',
+        )
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_warns_file_mode(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
+        """Test acreate_batch call with custom_id list."""
+        mock_upload = mock_async_openai.files.create = mocker.AsyncMock()
+        mock_upload.return_value.id = 'file-id'
+        mock_create = mock_async_openai.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        mock_logger = mocker.patch('nekomata.clients.plugins.openai.logger')
+        mock_logger.warning = mocker.MagicMock()
+
+        client = OpenAIClient(api_key='test-key')
+
+        res = await client.acreate_batch(
+            model='gpt-4o',
+            prompt=['hello', 'world'],
+            custom_id=['id-1', 'id-2'],
+            mode='inline',
+        )
+
+        # Create should be called successfully reguardless of "mode" validity.
+        mock_upload.assert_called_once()
+        mock_create.assert_called_once_with(
+            completion_window='24h',
+            endpoint='/v1/chat/completions',
+            input_file_id='file-id',
+        )
+        assert res == 'mock-batch'
+
+        # The users should be warned.
+        mock_logger.warning.assert_called_once_with(
+            'OpenAI only supports Files API-based batch requests. Proceeding with "file".'
+        )
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_validation_error(self, client: OpenAIClient) -> None:
+        """Test acreate_batch validation error when no list is provided."""
+        with pytest.raises(ValueError, match=r'At least one of prompt,.* must be a list'):
+            await client.acreate_batch(model='gpt-4o', prompt='hello')
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_length_mismatch(self, client: OpenAIClient) -> None:
+        """Test acreate_batch validation error when list lengths mismatch."""
+        with pytest.raises(ValueError, match='Lengths of list arguments do not match'):
+            await client.acreate_batch(
+                model='gpt-4o', prompt=['hello', 'world'], system_prompt=['sys1', 'sys2', 'sys3']
+            )
+
+    @pytest.mark.anyio
+    async def test_aretrieve_batch(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
+        """Test aretrieve_batch call."""
+        mock_retrieve = mock_async_openai.batches.retrieve = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.aretrieve_batch('batch-id', timeout=10.0)
+
+        mock_retrieve.assert_called_once_with('batch-id', timeout=10.0)
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acancel_batch(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
+        """Test acancel_batch call."""
+        mock_cancel = mock_async_openai.batches.cancel = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.acancel_batch('batch-id', timeout=10.0)
+
+        mock_cancel.assert_called_once_with('batch-id', timeout=10.0)
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_alist_batches(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
+        """Test alist_batches call."""
+        mock_list = mock_async_openai.batches.list = mocker.AsyncMock(return_value='mock-batches')
+
+        res = await client.alist_batches(after='after-id', limit=5)
+
+        mock_list.assert_called_once_with(after='after-id', limit=5)
+        assert res == 'mock-batches'
+
+    @pytest.mark.anyio
+    async def test_adelete_batch(self, client: OpenAIClient) -> None:
+        """Test adelete_batch raises NotImplementedError."""
+        with pytest.raises(NotImplementedError, match=r'OpenAI does not support deleting batches\.'):
+            await client.adelete_batch('batch-id')

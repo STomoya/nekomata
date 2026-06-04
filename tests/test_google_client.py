@@ -1,10 +1,12 @@
 """Tests for the Google client."""
 
+import json
 import time
 from collections.abc import Callable
 from unittest.mock import ANY, MagicMock
 
 import pytest
+from google.genai import types
 from google.genai.interactions import Interaction, TextContent, ThoughtStep
 from google.genai.types import GenerateContentResponse
 from pydantic import BaseModel
@@ -35,7 +37,9 @@ def mock_google_class(mocker: MockerFixture) -> MagicMock:
 @pytest.fixture
 def mock_google_client(mock_google_class: MagicMock) -> MagicMock:
     """Provide the mocked instance of the Google GenAI Client."""
-    return mock_google_class.return_value
+    client = mock_google_class.return_value
+    client.vertexai = False
+    return client
 
 
 @pytest.fixture
@@ -265,11 +269,11 @@ class TestGoogleGenerateContent:
         assert converted.content == 'text'
         assert converted.reason == 'thought'
         assert converted.finish_reason == 'STOP'
-        assert converted.total_tokens == 30  # noqa: PLR2004
-        assert converted.input_tokens == 20  # noqa: PLR2004
-        assert converted.output_tokens == 10  # noqa: PLR2004
-        assert converted.cache_tokens == 5  # noqa: PLR2004
-        assert converted.reason_tokens == 2  # noqa: PLR2004
+        assert converted.total_tokens == 30
+        assert converted.input_tokens == 20
+        assert converted.output_tokens == 10
+        assert converted.cache_tokens == 5
+        assert converted.reason_tokens == 2
 
     def test_convert_output_no_candidates(self, mocker: MockerFixture, client: GoogleClient) -> None:
         """Test that convert_output raises ValueError when candidates list is empty."""
@@ -438,11 +442,11 @@ class TestGoogleInteractions:
         assert converted.content == 'hello text'
         assert converted.reason == 'thinking text'
         assert converted.finish_reason == 'COMPLETED'
-        assert converted.total_tokens == 50  # noqa: PLR2004
-        assert converted.input_tokens == 25  # noqa: PLR2004
-        assert converted.output_tokens == 25  # noqa: PLR2004
-        assert converted.cache_tokens == 10  # noqa: PLR2004
-        assert converted.reason_tokens == 5  # noqa: PLR2004
+        assert converted.total_tokens == 50
+        assert converted.input_tokens == 25
+        assert converted.output_tokens == 25
+        assert converted.cache_tokens == 10
+        assert converted.reason_tokens == 5
 
     def test_convert_interactions_output_structured(
         self, interactions_response_factory: Callable[..., MagicMock], client: GoogleClient
@@ -477,3 +481,253 @@ class TestGoogleInteractions:
 
         # The empty thought parsing logic sets it to None
         assert converted.reason is None
+
+
+class TestGoogleBatchAPI:
+    """Test suite for Google GenAI Batch API operations."""
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_file_mode(
+        self, mocker: MockerFixture, mock_google_client: MagicMock, client: GoogleClient
+    ) -> None:
+        """Test acreate_batch in file mode (default)."""
+        mock_upload = mock_google_client.aio.files.upload = mocker.AsyncMock()
+        mock_upload.return_value.name = 'files/123'
+        mock_create = mock_google_client.aio.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.acreate_batch(
+            model='gemini-1.5-pro',
+            prompt=['hello', 'world'],
+            system_prompt='sys prompt',
+            max_output_tokens=100,
+            reasoning_effort='medium',
+            response_format=_MockStructuredResponse,
+            mode='file',
+        )
+
+        mock_upload.assert_called_once()
+        kwargs = mock_upload.call_args[1]
+        uploaded_bytes = kwargs['file'].getvalue()
+        uploaded_text = uploaded_bytes.decode('utf-8')
+        lines = uploaded_text.strip().split('\n')
+        assert len(lines) == 2
+
+        req0 = json.loads(lines[0])
+        assert req0['key'].startswith('req-')
+        assert req0['request']['contents'] == 'hello'
+        assert req0['request']['config']['systemInstruction'] == 'sys prompt'
+        assert req0['request']['config']['maxOutputTokens'] == 100
+        assert req0['request']['config']['responseSchema'] == _MockStructuredResponse.model_json_schema()
+        assert req0['request']['config']['thinkingConfig'] == {'includeThoughts': True, 'thinkingLevel': 'MEDIUM'}
+
+        mock_create.assert_called_once_with(
+            model='gemini-1.5-pro',
+            src=types.BatchJobSource(file_name='files/123'),
+        )
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_with_custom_id_string_file_mode(
+        self, mocker: MockerFixture, mock_google_client: MagicMock, client: GoogleClient
+    ) -> None:
+        """Test acreate_batch with single custom_id string in file mode."""
+        mock_upload = mock_google_client.aio.files.upload = mocker.AsyncMock()
+        mock_upload.return_value.name = 'files/123'
+        mock_create = mock_google_client.aio.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.acreate_batch(
+            model='gemini-1.5-pro',
+            prompt=['hello', 'world'],
+            custom_id='custom-id-prefix',
+            mode='file',
+        )
+
+        mock_upload.assert_called_once()
+        mock_create.assert_called_once()
+        kwargs = mock_upload.call_args[1]
+        uploaded_bytes = kwargs['file'].getvalue()
+        uploaded_text = uploaded_bytes.decode('utf-8')
+        lines = uploaded_text.strip().split('\n')
+        assert len(lines) == 2
+
+        req0 = json.loads(lines[0])
+        req1 = json.loads(lines[1])
+        assert req0['key'] == 'custom-id-prefix-0'
+        assert req1['key'] == 'custom-id-prefix-1'
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_with_custom_id_list_file_mode(
+        self, mocker: MockerFixture, mock_google_client: MagicMock, client: GoogleClient
+    ) -> None:
+        """Test acreate_batch with custom_id list in file mode."""
+        mock_upload = mock_google_client.aio.files.upload = mocker.AsyncMock()
+        mock_upload.return_value.name = 'files/123'
+        mock_create = mock_google_client.aio.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.acreate_batch(
+            model='gemini-1.5-pro',
+            prompt=['hello', 'world'],
+            custom_id=['id-1', 'id-2'],
+            mode='file',
+        )
+
+        mock_upload.assert_called_once()
+        mock_create.assert_called_once()
+        kwargs = mock_upload.call_args[1]
+        uploaded_bytes = kwargs['file'].getvalue()
+        uploaded_text = uploaded_bytes.decode('utf-8')
+        lines = uploaded_text.strip().split('\n')
+        assert len(lines) == 2
+
+        req0 = json.loads(lines[0])
+        req1 = json.loads(lines[1])
+        assert req0['key'] == 'id-1'
+        assert req1['key'] == 'id-2'
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_inline_mode(
+        self, mocker: MockerFixture, mock_google_client: MagicMock, client: GoogleClient
+    ) -> None:
+        """Test acreate_batch in inline mode."""
+        mock_create = mock_google_client.aio.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.acreate_batch(
+            model='gemini-1.5-pro',
+            prompt=['hello', 'world'],
+            system_prompt='sys prompt',
+            max_output_tokens=100,
+            reasoning_effort='medium',
+            response_format=_MockStructuredResponse,
+            mode='inline',
+        )
+
+        mock_create.assert_called_once()
+        called_args = mock_create.call_args[1]
+        assert called_args['model'] == 'gemini-1.5-pro'
+        src = called_args['src']
+        assert len(src) == 2
+        assert src[0].contents == 'hello'
+        assert src[0].metadata['custom_id'].startswith('req-')
+        assert src[1].metadata['custom_id'].startswith('req-')
+        assert src[0].config.system_instruction == 'sys prompt'
+        assert src[0].config.max_output_tokens == 100
+        assert src[0].config.response_schema == _MockStructuredResponse
+        assert src[0].config.thinking_config.thinking_level == 'MEDIUM'
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_with_custom_id_string_inline_mode(
+        self, mocker: MockerFixture, mock_google_client: MagicMock, client: GoogleClient
+    ) -> None:
+        """Test acreate_batch with single custom_id string in inline mode."""
+        mock_create = mock_google_client.aio.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.acreate_batch(
+            model='gemini-1.5-pro',
+            prompt=['hello', 'world'],
+            custom_id='custom-id-prefix',
+            mode='inline',
+        )
+
+        mock_create.assert_called_once()
+        called_args = mock_create.call_args[1]
+        src = called_args['src']
+        assert len(src) == 2
+        assert src[0].metadata['custom_id'] == 'custom-id-prefix-0'
+        assert src[1].metadata['custom_id'] == 'custom-id-prefix-1'
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_with_custom_id_list_inline_mode(
+        self, mocker: MockerFixture, mock_google_client: MagicMock, client: GoogleClient
+    ) -> None:
+        """Test acreate_batch with custom_id list in inline mode."""
+        mock_create = mock_google_client.aio.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.acreate_batch(
+            model='gemini-1.5-pro',
+            prompt=['hello', 'world'],
+            custom_id=['id-1', 'id-2'],
+            mode='inline',
+        )
+
+        mock_create.assert_called_once()
+        called_args = mock_create.call_args[1]
+        src = called_args['src']
+        assert len(src) == 2
+        assert src[0].metadata['custom_id'] == 'id-1'
+        assert src[1].metadata['custom_id'] == 'id-2'
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_length_mismatch(self, mock_google_client: MagicMock, client: GoogleClient) -> None:
+        """Test acreate_batch length mismatch validation."""
+        with pytest.raises(ValueError, match='Lengths of list arguments do not match'):
+            await client.acreate_batch(
+                model='gemini-1.5-pro',
+                prompt=['hello', 'world'],
+                custom_id=['id-1', 'id-2', 'id-3'],
+            )
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_validation_error(self, mock_google_client: MagicMock, client: GoogleClient) -> None:
+        """Test acreate_batch validation error when no list is provided."""
+        with pytest.raises(ValueError, match=r'At least one of prompt,.* must be a list'):
+            await client.acreate_batch(model='gemini', prompt='hello')
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_vertex_ai(self, mock_google_client: MagicMock, client: GoogleClient) -> None:
+        """Test acreate_batch validation error when no list is provided."""
+        mock_google_client.vertexai = True
+        with pytest.raises(RuntimeError, match=r'We currently do not support the Batch API on Vertex AI.'):
+            await client.acreate_batch(model='gemini', prompt='hello')
+
+    @pytest.mark.anyio
+    async def test_aretrieve_batch(
+        self, mocker: MockerFixture, mock_google_client: MagicMock, client: GoogleClient
+    ) -> None:
+        """Test aretrieve_batch call."""
+        mock_get = mock_google_client.aio.batches.get = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.aretrieve_batch('batch-id', config={'val': 1})
+
+        mock_get.assert_called_once_with(name='batch-id', config={'val': 1})
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acancel_batch(
+        self, mocker: MockerFixture, mock_google_client: MagicMock, client: GoogleClient
+    ) -> None:
+        """Test acancel_batch call."""
+        mock_cancel = mock_google_client.aio.batches.cancel = mocker.AsyncMock(return_value='mock-batch')
+
+        res = await client.acancel_batch('batch-id', config={'val': 2})
+
+        mock_cancel.assert_called_once_with(name='batch-id', config={'val': 2})
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_alist_batches(
+        self, mocker: MockerFixture, mock_google_client: MagicMock, client: GoogleClient
+    ) -> None:
+        """Test alist_batches call."""
+        mock_list = mock_google_client.aio.batches.list = mocker.AsyncMock(return_value='mock-batches')
+
+        res = await client.alist_batches(config={'val': 3})
+
+        mock_list.assert_called_once_with(config={'val': 3})
+        assert res == 'mock-batches'
+
+    @pytest.mark.anyio
+    async def test_adelete_batch(
+        self, mocker: MockerFixture, mock_google_client: MagicMock, client: GoogleClient
+    ) -> None:
+        """Test adelete_batch call."""
+        mock_delete = mock_google_client.aio.batches.delete = mocker.AsyncMock(return_value='mock-deleted')
+
+        res = await client.adelete_batch('batch-id', config={'val': 4})
+
+        mock_delete.assert_called_once_with(name='batch-id', config={'val': 4})
+        assert res == 'mock-deleted'

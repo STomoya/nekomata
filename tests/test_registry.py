@@ -48,7 +48,7 @@ class TestRegistry:
 
         keys = registry.list_keys()
 
-        assert len(keys) == 2  # noqa: PLR2004
+        assert len(keys) == 2
         assert 'service_a' in keys
         assert 'service_b' in keys
 

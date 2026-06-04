@@ -11,6 +11,7 @@ from openai.types.chat import (
 from openai.types.responses import ParsedResponse, Response, ResponseReasoningItem
 
 from nekomata.clients.base import ClientABC
+from nekomata.clients.plugins.openai import OpenAIBatchAPIPlugin
 from nekomata.clients.utils import filter_none
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.types.openai import OpenAIArgs, OpenAIChatCompletionCommonAttrs, ResponsesArgs
@@ -22,7 +23,7 @@ ResponseFormatT = TypeVar('ResponseFormatT')
 logger = get_logger(__name__)
 
 
-class OpenAIClient(ClientABC):
+class OpenAIClient(ClientABC, OpenAIBatchAPIPlugin):
     """OpenAI Client."""
 
     def __init__(

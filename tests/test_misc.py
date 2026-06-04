@@ -20,14 +20,14 @@ class TestMiscUtils:
         """Test getting an existing environment variable as integer."""
         with patch.dict(os.environ, {'TEST_VAR': '123'}):
             value = get_env('TEST_VAR', type=int, default=0)
-            assert value == 123  # noqa: PLR2004
+            assert value == 123
             assert isinstance(value, int)
 
     def test_get_env_success_float(self) -> None:
         """Test getting an existing environment variable as float."""
         with patch.dict(os.environ, {'TEST_VAR': '1.23'}):
             value = get_env('TEST_VAR', type=float, default=0.0)
-            assert value == 1.23  # noqa: PLR2004
+            assert value == 1.23
             assert isinstance(value, float)
 
     def test_get_env_missing_with_default(self) -> None:
@@ -35,7 +35,7 @@ class TestMiscUtils:
         if 'MISSING_VAR' in os.environ:
             del os.environ['MISSING_VAR']
         value = get_env('MISSING_VAR', type=int, default=42)
-        assert value == 42  # noqa: PLR2004
+        assert value == 42
 
     def test_get_env_missing_no_default(self) -> None:
         """Test returning None when variable is missing and no default is provided."""
