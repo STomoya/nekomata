@@ -645,6 +645,41 @@ class TestOpenAIBatchAPI:
         assert res == 'mock-batch'
 
     @pytest.mark.anyio
+    async def test_acreate_batch_warns_file_mode(
+        self, mocker: MockerFixture, mock_async_openai: MagicMock, client: OpenAIClient
+    ) -> None:
+        """Test acreate_batch call with custom_id list."""
+        mock_upload = mock_async_openai.files.create = mocker.AsyncMock()
+        mock_upload.return_value.id = 'file-id'
+        mock_create = mock_async_openai.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        mock_logger = mocker.patch('nekomata.clients.plugins.openai.logger')
+        mock_logger.warning = mocker.MagicMock()
+
+        client = OpenAIClient(api_key='test-key')
+
+        res = await client.acreate_batch(
+            model='gpt-4o',
+            prompt=['hello', 'world'],
+            custom_id=['id-1', 'id-2'],
+            mode='inline',
+        )
+
+        # Create should be called successfully reguardless of "mode" validity.
+        mock_upload.assert_called_once()
+        mock_create.assert_called_once_with(
+            completion_window='24h',
+            endpoint='/v1/chat/completions',
+            input_file_id='file-id',
+        )
+        assert res == 'mock-batch'
+
+        # The users should be warned.
+        mock_logger.warning.assert_called_once_with(
+            'OpenAI only supports Files API-based batch requests. Proceeding with "file".'
+        )
+
+    @pytest.mark.anyio
     async def test_acreate_batch_validation_error(self, client: OpenAIClient) -> None:
         """Test acreate_batch validation error when no list is provided."""
         with pytest.raises(ValueError, match=r'At least one of prompt,.* must be a list'):

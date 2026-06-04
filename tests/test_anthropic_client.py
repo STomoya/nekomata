@@ -353,6 +353,34 @@ class TestAnthropicBatchAPI:
         assert res == 'mock-batch'
 
     @pytest.mark.anyio
+    async def test_acreate_batch_warns_file_mode(self, mocker: MockerFixture) -> None:
+        """Test acreate_batch call with custom_id list."""
+        mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        mock_instance = mock_anthropic_class.return_value
+        mock_create = mock_instance.beta.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        mock_logger = mocker.patch('nekomata.clients.plugins.anthropic.logger')
+        mock_logger.warning = mocker.MagicMock()
+
+        client = AnthropicClient(api_key='test-key')
+
+        res = await client.acreate_batch(
+            model='claude-3-5-sonnet',
+            prompt=['hello', 'world'],
+            custom_id=['id-1', 'id-2'],
+            mode='file',
+        )
+
+        # Create should be called successfully reguardless of "mode" validity.
+        mock_create.assert_called_once()
+        assert res == 'mock-batch'
+
+        # The users should be warned.
+        mock_logger.warning.assert_called_once_with(
+            'Anthropic only supports inline batch requests. Proceeding with "inline".'
+        )
+
+    @pytest.mark.anyio
     async def test_acreate_batch_length_mismatch(self, mocker: MockerFixture) -> None:
         """Test acreate_batch call with list length mismatch."""
         mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
