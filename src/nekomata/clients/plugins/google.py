@@ -19,6 +19,10 @@ class GoogleBatchAPIPlugin(BatchAPIPlugin):
 
     _client: Client
 
+    def _is_vertex_ai(self) -> bool:
+        """Check if the client is connected to a vertexai prject."""
+        return self._client.vertexai
+
     async def acreate_batch(
         self,
         *,
@@ -44,6 +48,9 @@ class GoogleBatchAPIPlugin(BatchAPIPlugin):
             mode (Literal['file', 'inline']): Batch mode.
 
         """
+        if self._is_vertex_ai():
+            raise RuntimeError('We currently do not support the Batch API on Vertex AI.')
+
         expanded = validate_and_expand_batch_args(
             prompt=prompt,
             system_prompt=system_prompt,
