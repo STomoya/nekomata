@@ -15,6 +15,7 @@ from anthropic.types import (
 )
 
 from nekomata.clients.base import ClientABC
+from nekomata.clients.plugins.anthropic import AnthropicBatchAPIPlugin
 from nekomata.types.anthropic import AnthropicArgs, AnthropicMessagesCommonAttrs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger, get_utc_timestamp
@@ -25,7 +26,7 @@ ResponseFormatT = TypeVar('ResponseFormatT')
 logger = get_logger(__name__)
 
 
-class AnthropicClient(ClientABC):
+class AnthropicClient(ClientABC, AnthropicBatchAPIPlugin):
     """Anthropic Client."""
 
     def __init__(

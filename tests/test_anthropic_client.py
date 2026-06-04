@@ -169,10 +169,10 @@ class TestAnthropicClient:
         assert common_attrs.content == 'text'
         assert common_attrs.reason == 'thinking'
         assert common_attrs.finish_reason == 'end_turn'
-        assert common_attrs.total_tokens == 30  # noqa: PLR2004
-        assert common_attrs.input_tokens == 20  # noqa: PLR2004
-        assert common_attrs.output_tokens == 10  # noqa: PLR2004
-        assert common_attrs.cache_tokens == 5  # noqa: PLR2004
+        assert common_attrs.total_tokens == 30
+        assert common_attrs.input_tokens == 20
+        assert common_attrs.output_tokens == 10
+        assert common_attrs.cache_tokens == 5
         assert common_attrs.reason_tokens is None
 
     @pytest.mark.anyio
@@ -205,10 +205,10 @@ class TestAnthropicClient:
         assert converted.content == 'text'
         assert converted.reason == 'thinking'
         assert converted.finish_reason == 'end_turn'
-        assert converted.total_tokens == 30  # noqa: PLR2004
-        assert converted.input_tokens == 20  # noqa: PLR2004
-        assert converted.output_tokens == 10  # noqa: PLR2004
-        assert converted.cache_tokens == 5  # noqa: PLR2004
+        assert converted.total_tokens == 30
+        assert converted.input_tokens == 20
+        assert converted.output_tokens == 10
+        assert converted.cache_tokens == 5
         assert converted.reason_tokens is None
 
     @pytest.mark.anyio
@@ -233,10 +233,10 @@ class TestAnthropicClient:
         assert converted.content == 'text'
         assert converted.reason == 'thinking'
         assert converted.finish_reason == 'end_turn'
-        assert converted.total_tokens == 30  # noqa: PLR2004
-        assert converted.input_tokens == 20  # noqa: PLR2004
-        assert converted.output_tokens == 10  # noqa: PLR2004
-        assert converted.cache_tokens == 5  # noqa: PLR2004
+        assert converted.total_tokens == 30
+        assert converted.input_tokens == 20
+        assert converted.output_tokens == 10
+        assert converted.cache_tokens == 5
         assert converted.reason_tokens is None
 
     @pytest.mark.anyio
@@ -265,3 +265,165 @@ class TestAnthropicClient:
         _args, kwargs = mock_instance.messages.create.call_args
         assert kwargs['thinking']['type'] == 'adaptive'
         assert kwargs['output_config']['effort'] == 'max'
+
+
+class TestAnthropicBatchAPI:
+    """Test suite for Anthropic Batch API operations."""
+
+    @pytest.mark.anyio
+    async def test_acreate_batch(self, mocker: MockerFixture) -> None:
+        """Test acreate_batch call with generated custom_id."""
+        mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        mock_instance = mock_anthropic_class.return_value
+        mock_create = mock_instance.beta.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        client = AnthropicClient(api_key='test-key')
+
+        class DummyResponse(BaseModel):
+            answer: str
+
+        res = await client.acreate_batch(
+            model='claude-3-5-sonnet',
+            prompt=['hello', 'world'],
+            system_prompt='sys prompt',
+            max_output_tokens=100,
+            reasoning_effort='high',
+            response_format=DummyResponse,
+        )
+
+        mock_create.assert_called_once()
+        called_args = mock_create.call_args[1]
+        requests = called_args['requests']
+        assert len(requests) == 2
+        assert requests[0]['custom_id'].startswith('req-')
+        assert requests[1]['custom_id'].startswith('req-')
+        assert requests[0]['params']['messages'] == [{'role': 'user', 'content': 'hello'}]
+        assert requests[1]['params']['messages'] == [{'role': 'user', 'content': 'world'}]
+        assert requests[0]['params']['max_tokens'] == 100
+        assert requests[0]['params']['system'] == 'sys prompt'
+        assert requests[0]['params']['thinking'] == {'type': 'adaptive', 'display': 'summarized'}
+        assert requests[0]['params']['output_config'] == {'effort': 'high'}
+        assert requests[0]['params']['output_format'] == DummyResponse
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_with_custom_id_string(self, mocker: MockerFixture) -> None:
+        """Test acreate_batch call with single custom_id string."""
+        mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        mock_instance = mock_anthropic_class.return_value
+        mock_create = mock_instance.beta.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        client = AnthropicClient(api_key='test-key')
+
+        res = await client.acreate_batch(
+            model='claude-3-5-sonnet',
+            prompt=['hello', 'world'],
+            custom_id='custom-id-prefix',
+        )
+
+        mock_create.assert_called_once()
+        called_args = mock_create.call_args[1]
+        requests = called_args['requests']
+        assert len(requests) == 2
+        assert requests[0]['custom_id'] == 'custom-id-prefix-0'
+        assert requests[1]['custom_id'] == 'custom-id-prefix-1'
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_with_custom_id_list(self, mocker: MockerFixture) -> None:
+        """Test acreate_batch call with custom_id list."""
+        mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        mock_instance = mock_anthropic_class.return_value
+        mock_create = mock_instance.beta.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        client = AnthropicClient(api_key='test-key')
+
+        res = await client.acreate_batch(
+            model='claude-3-5-sonnet',
+            prompt=['hello', 'world'],
+            custom_id=['id-1', 'id-2'],
+        )
+
+        mock_create.assert_called_once()
+        called_args = mock_create.call_args[1]
+        requests = called_args['requests']
+        assert len(requests) == 2
+        assert requests[0]['custom_id'] == 'id-1'
+        assert requests[1]['custom_id'] == 'id-2'
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_length_mismatch(self, mocker: MockerFixture) -> None:
+        """Test acreate_batch call with list length mismatch."""
+        mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        client = AnthropicClient(api_key='test-key')
+        with pytest.raises(ValueError, match='Lengths of list arguments do not match'):
+            await client.acreate_batch(
+                model='claude-3-5-sonnet',
+                prompt=['hello', 'world'],
+                custom_id=['id-1', 'id-2', 'id-3'],
+            )
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_validation_error(self, mocker: MockerFixture) -> None:
+        """Test acreate_batch validation error when no list is provided."""
+        mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        client = AnthropicClient(api_key='test-key')
+        with pytest.raises(ValueError, match=r'At least one of prompt,.* must be a list'):
+            await client.acreate_batch(model='claude-3-5-sonnet', prompt='hello')
+
+    @pytest.mark.anyio
+    async def test_aretrieve_batch(self, mocker: MockerFixture) -> None:
+        """Test aretrieve_batch call."""
+        mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        mock_instance = mock_anthropic_class.return_value
+        mock_retrieve = mock_instance.beta.messages.batches.retrieve = mocker.AsyncMock(return_value='mock-batch')
+
+        client = AnthropicClient(api_key='test-key')
+
+        res = await client.aretrieve_batch('batch-id', timeout=10.0)
+
+        mock_retrieve.assert_called_once_with('batch-id', timeout=10.0)
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acancel_batch(self, mocker: MockerFixture) -> None:
+        """Test acancel_batch call."""
+        mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        mock_instance = mock_anthropic_class.return_value
+        mock_cancel = mock_instance.beta.messages.batches.cancel = mocker.AsyncMock(return_value='mock-batch')
+
+        client = AnthropicClient(api_key='test-key')
+
+        res = await client.acancel_batch('batch-id', timeout=10.0)
+
+        mock_cancel.assert_called_once_with('batch-id', timeout=10.0)
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_alist_batches(self, mocker: MockerFixture) -> None:
+        """Test alist_batches call."""
+        mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        mock_instance = mock_anthropic_class.return_value
+        mock_list = mock_instance.beta.messages.batches.list = mocker.AsyncMock(return_value='mock-batches')
+
+        client = AnthropicClient(api_key='test-key')
+
+        res = await client.alist_batches(after_id='after-id', limit=5)
+
+        mock_list.assert_called_once_with(after_id='after-id', limit=5)
+        assert res == 'mock-batches'
+
+    @pytest.mark.anyio
+    async def test_adelete_batch(self, mocker: MockerFixture) -> None:
+        """Test adelete_batch call."""
+        mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        mock_instance = mock_anthropic_class.return_value
+        mock_delete = mock_instance.beta.messages.batches.delete = mocker.AsyncMock(return_value='mock-deleted')
+
+        client = AnthropicClient(api_key='test-key')
+
+        res = await client.adelete_batch('batch-id', timeout=10.0)
+
+        mock_delete.assert_called_once_with('batch-id', timeout=10.0)
+        assert res == 'mock-deleted'

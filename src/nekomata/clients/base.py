@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from contextlib import nullcontext
 from json import JSONDecodeError
-from typing import Any, TypeVar, overload
+from typing import Any, Literal, TypeVar, overload
 
 import anyio
 import httpx
@@ -294,3 +294,43 @@ class ClientABC(ABC):
                 return self.handle_exception('API error', exc=e, created_at=created_at, custom_id=custom_id)
             else:
                 return response
+
+
+class BatchAPIPlugin(ABC):
+    """Abstract plugin class for Batch API support."""
+
+    @abstractmethod
+    async def acreate_batch(
+        self,
+        *,
+        model: str,
+        prompt: str | list[str],
+        system_prompt: str | list[str] | None = None,
+        max_output_tokens: int | list[int] | None = None,
+        response_format: type[Any] | list[type[Any]] | None = None,
+        reasoning_effort: str | list[str] | None = None,
+        custom_id: str | list[str] | None = None,
+        mode: Literal['file', 'inline'] = 'file',
+    ) -> Any:
+        """Create a new batch job."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def aretrieve_batch(self, batch_id: str, *args: Any, **kwargs: Any) -> Any:
+        """Retrieve the status and details of a batch job."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def acancel_batch(self, batch_id: str, *args: Any, **kwargs: Any) -> Any:
+        """Cancel an active batch job."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def alist_batches(self, *args: Any, **kwargs: Any) -> Any:
+        """List batch jobs."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def adelete_batch(self, batch_id: str, *args: Any, **kwargs: Any) -> Any:
+        """Delete a batch job."""
+        raise NotImplementedError
