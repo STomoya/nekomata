@@ -37,7 +37,9 @@ def mock_google_class(mocker: MockerFixture) -> MagicMock:
 @pytest.fixture
 def mock_google_client(mock_google_class: MagicMock) -> MagicMock:
     """Provide the mocked instance of the Google GenAI Client."""
-    return mock_google_class.return_value
+    client = mock_google_class.return_value
+    client.vertexai = False
+    return client
 
 
 @pytest.fixture
@@ -673,6 +675,13 @@ class TestGoogleBatchAPI:
     async def test_acreate_batch_validation_error(self, mock_google_client: MagicMock, client: GoogleClient) -> None:
         """Test acreate_batch validation error when no list is provided."""
         with pytest.raises(ValueError, match=r'At least one of prompt,.* must be a list'):
+            await client.acreate_batch(model='gemini', prompt='hello')
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_vertex_ai(self, mock_google_client: MagicMock, client: GoogleClient) -> None:
+        """Test acreate_batch validation error when no list is provided."""
+        mock_google_client.vertexai = True
+        with pytest.raises(RuntimeError, match=r'We currently do not support the Batch API on Vertex AI.'):
             await client.acreate_batch(model='gemini', prompt='hello')
 
     @pytest.mark.anyio
