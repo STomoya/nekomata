@@ -9,11 +9,12 @@ from typing import Any, Literal, Self, TypeVar, overload
 from anyio.from_thread import BlockingPortal, start_blocking_portal
 
 from nekomata.dispatcher.dispatcher import AsyncLLMDispatcher
+from nekomata.types.clients import PackageSpecificArgs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger
 
 ResponseFormatT = TypeVar('ResponseFormatT')
-
+PackageArgsT = TypeVar('PackageArgsT', bound=PackageSpecificArgs)
 logger = get_logger(__name__)
 
 
@@ -151,6 +152,7 @@ class SyncLLMDispatcher:
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
+        args: PackageArgsT | None = None,
     ) -> concurrent.futures.Future[ChatCompletionResponse[None]]: ...
 
     @overload
@@ -172,6 +174,7 @@ class SyncLLMDispatcher:
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
+        args: PackageArgsT | None = None,
     ) -> concurrent.futures.Future[ChatCompletionResponse[ResponseFormatT]]: ...
 
     def submit(
@@ -192,6 +195,7 @@ class SyncLLMDispatcher:
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
+        args: PackageArgsT | None = None,
     ) -> concurrent.futures.Future[ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]]:
         """Execute an LLM request.
 
@@ -218,6 +222,7 @@ class SyncLLMDispatcher:
                 Defaults to None.
             max_model_retry (int, optional): Maximum number of retries when failed to validate generated content to
                 pydantic model. Defaults to 1.
+            args (PackageArgsT | None, optional): Package specific arguments. Defaults to None
 
         Returns:
             ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]: Response from the API.
@@ -247,4 +252,5 @@ class SyncLLMDispatcher:
             extra_body,
             custom_id,
             max_model_retry,
+            args,
         )
