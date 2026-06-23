@@ -87,6 +87,7 @@ class TestSyncLLMDispatcher:
             {'chat_template_kwargs': {'enable_thinking': True}},
             'id-000',
             2,
+            None,
         )
 
     def test_submit_not_running(self) -> None:
