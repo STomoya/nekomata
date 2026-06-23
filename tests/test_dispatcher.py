@@ -139,6 +139,7 @@ class TestAsyncLLMDispatcher:
                 extra_body={'chat_template_kwargs': {'enable_thinking': True}},
                 custom_id='id-000',
                 max_model_retry=2,
+                args=None,
             )
 
     @pytest.mark.anyio
