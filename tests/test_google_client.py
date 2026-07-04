@@ -513,12 +513,29 @@ class TestGoogleBatchAPI:
         assert len(lines) == 2
 
         req0 = json.loads(lines[0])
-        assert req0['key'].startswith('req-')
-        assert req0['request']['contents'] == 'hello'
-        assert req0['request']['config']['systemInstruction'] == 'sys prompt'
-        assert req0['request']['config']['maxOutputTokens'] == 100
-        assert req0['request']['config']['responseSchema'] == _MockStructuredResponse.model_json_schema()
-        assert req0['request']['config']['thinkingConfig'] == {'includeThoughts': True, 'thinkingLevel': 'MEDIUM'}
+        assert req0['metadata']['custom_id'].startswith('req-')
+        assert req0['request']['contents'] == [{'parts': [{'text': 'hello'}], 'role': 'user'}]
+        assert req0['request']['systemInstruction'] == {
+            'parts': [{'text': 'sys prompt'}],
+            'role': 'user',
+        }
+        assert req0['request']['generationConfig']['maxOutputTokens'] == 100
+        assert req0['request']['generationConfig']['responseSchema'] == {
+            'description': 'Shared Pydantic model for testing structured output.',
+            'properties': {
+                'answer': {
+                    'title': 'Answer',
+                    'type': 'STRING',
+                },
+            },
+            'required': ['answer'],
+            'title': '_MockStructuredResponse',
+            'type': 'OBJECT',
+        }
+        assert req0['request']['generationConfig']['thinkingConfig'] == {
+            'include_thoughts': True,
+            'thinking_level': 'MEDIUM',
+        }
 
         mock_create.assert_called_once_with(
             model='gemini-1.5-pro',
@@ -552,8 +569,8 @@ class TestGoogleBatchAPI:
 
         req0 = json.loads(lines[0])
         req1 = json.loads(lines[1])
-        assert req0['key'] == 'custom-id-prefix-0'
-        assert req1['key'] == 'custom-id-prefix-1'
+        assert req0['metadata']['custom_id'] == 'custom-id-prefix-0'
+        assert req1['metadata']['custom_id'] == 'custom-id-prefix-1'
         assert res == 'mock-batch'
 
     @pytest.mark.anyio
@@ -582,8 +599,8 @@ class TestGoogleBatchAPI:
 
         req0 = json.loads(lines[0])
         req1 = json.loads(lines[1])
-        assert req0['key'] == 'id-1'
-        assert req1['key'] == 'id-2'
+        assert req0['metadata']['custom_id'] == 'id-1'
+        assert req1['metadata']['custom_id'] == 'id-2'
         assert res == 'mock-batch'
 
     @pytest.mark.anyio

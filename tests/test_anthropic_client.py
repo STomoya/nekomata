@@ -275,7 +275,7 @@ class TestAnthropicBatchAPI:
         """Test acreate_batch call with generated custom_id."""
         mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
         mock_instance = mock_anthropic_class.return_value
-        mock_create = mock_instance.beta.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
+        mock_create = mock_instance.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
 
         client = AnthropicClient(api_key='test-key')
 
@@ -302,8 +302,82 @@ class TestAnthropicBatchAPI:
         assert requests[0]['params']['max_tokens'] == 100
         assert requests[0]['params']['system'] == 'sys prompt'
         assert requests[0]['params']['thinking'] == {'type': 'adaptive', 'display': 'summarized'}
-        assert requests[0]['params']['output_config'] == {'effort': 'high'}
-        assert requests[0]['params']['output_format'] == DummyResponse
+        expected_schema = DummyResponse.model_json_schema()
+        expected_schema['additionalProperties'] = False
+        assert requests[0]['params']['output_config'] == {
+            'effort': 'high',
+            'format': {
+                'type': 'json_schema',
+                'schema': expected_schema,
+            },
+        }
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_with_dict_response_format(self, mocker: MockerFixture) -> None:
+        """Test acreate_batch call with dictionary response_format."""
+        mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        mock_instance = mock_anthropic_class.return_value
+        mock_create = mock_instance.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        client = AnthropicClient(api_key='test-key')
+
+        dummy_schema = {'type': 'object', 'properties': {'answer': {'type': 'string'}}}
+
+        res = await client.acreate_batch(
+            model='claude-3-5-sonnet',
+            prompt=['hello'],
+            response_format=dummy_schema,  # ty: ignore[invalid-argument-type]
+        )
+
+        mock_create.assert_called_once()
+        called_args = mock_create.call_args[1]
+        requests = called_args['requests']
+        assert len(requests) == 1
+        expected_schema = {
+            'type': 'object',
+            'properties': {'answer': {'type': 'string'}},
+            'additionalProperties': False,
+        }
+        assert requests[0]['params']['output_config'] == {
+            'format': {
+                'type': 'json_schema',
+                'schema': expected_schema,
+            },
+        }
+        assert res == 'mock-batch'
+
+    @pytest.mark.anyio
+    async def test_acreate_batch_with_complex_response_format(self, mocker: MockerFixture) -> None:
+        """Test acreate_batch call with complex response_format to trigger full schema recursion."""
+        mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
+        mock_instance = mock_anthropic_class.return_value
+        mock_create = mock_instance.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
+
+        client = AnthropicClient(api_key='test-key')
+
+        class SubModel(BaseModel):
+            nested_field: str
+
+        class ComplexModel(BaseModel):
+            list_field: list[SubModel]
+            union_field: str | int
+            sub_model: SubModel
+
+        res = await client.acreate_batch(
+            model='claude-3-5-sonnet',
+            prompt=['hello'],
+            response_format=ComplexModel,
+        )
+
+        mock_create.assert_called_once()
+        called_args = mock_create.call_args[1]
+        requests = called_args['requests']
+        assert len(requests) == 1
+        schema = requests[0]['params']['output_config']['format']['schema']
+        assert schema['type'] == 'object'
+        assert schema['additionalProperties'] is False
+        assert schema['$defs']['SubModel']['additionalProperties'] is False
         assert res == 'mock-batch'
 
     @pytest.mark.anyio
@@ -311,7 +385,7 @@ class TestAnthropicBatchAPI:
         """Test acreate_batch call with single custom_id string."""
         mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
         mock_instance = mock_anthropic_class.return_value
-        mock_create = mock_instance.beta.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
+        mock_create = mock_instance.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
 
         client = AnthropicClient(api_key='test-key')
 
@@ -334,7 +408,7 @@ class TestAnthropicBatchAPI:
         """Test acreate_batch call with custom_id list."""
         mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
         mock_instance = mock_anthropic_class.return_value
-        mock_create = mock_instance.beta.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
+        mock_create = mock_instance.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
 
         client = AnthropicClient(api_key='test-key')
 
@@ -357,7 +431,7 @@ class TestAnthropicBatchAPI:
         """Test acreate_batch call with custom_id list."""
         mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
         mock_instance = mock_anthropic_class.return_value
-        mock_create = mock_instance.beta.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
+        mock_create = mock_instance.messages.batches.create = mocker.AsyncMock(return_value='mock-batch')
 
         mock_logger = mocker.patch('nekomata.clients.plugins.anthropic.logger')
         mock_logger.warning = mocker.MagicMock()
@@ -405,7 +479,7 @@ class TestAnthropicBatchAPI:
         """Test aretrieve_batch call."""
         mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
         mock_instance = mock_anthropic_class.return_value
-        mock_retrieve = mock_instance.beta.messages.batches.retrieve = mocker.AsyncMock(return_value='mock-batch')
+        mock_retrieve = mock_instance.messages.batches.retrieve = mocker.AsyncMock(return_value='mock-batch')
 
         client = AnthropicClient(api_key='test-key')
 
@@ -419,7 +493,7 @@ class TestAnthropicBatchAPI:
         """Test acancel_batch call."""
         mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
         mock_instance = mock_anthropic_class.return_value
-        mock_cancel = mock_instance.beta.messages.batches.cancel = mocker.AsyncMock(return_value='mock-batch')
+        mock_cancel = mock_instance.messages.batches.cancel = mocker.AsyncMock(return_value='mock-batch')
 
         client = AnthropicClient(api_key='test-key')
 
@@ -433,7 +507,7 @@ class TestAnthropicBatchAPI:
         """Test alist_batches call."""
         mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
         mock_instance = mock_anthropic_class.return_value
-        mock_list = mock_instance.beta.messages.batches.list = mocker.AsyncMock(return_value='mock-batches')
+        mock_list = mock_instance.messages.batches.list = mocker.AsyncMock(return_value='mock-batches')
 
         client = AnthropicClient(api_key='test-key')
 
@@ -447,7 +521,7 @@ class TestAnthropicBatchAPI:
         """Test adelete_batch call."""
         mock_anthropic_class = mocker.patch('nekomata.clients.providers.anthropic.AsyncAnthropic')
         mock_instance = mock_anthropic_class.return_value
-        mock_delete = mock_instance.beta.messages.batches.delete = mocker.AsyncMock(return_value='mock-deleted')
+        mock_delete = mock_instance.messages.batches.delete = mocker.AsyncMock(return_value='mock-deleted')
 
         client = AnthropicClient(api_key='test-key')
 
