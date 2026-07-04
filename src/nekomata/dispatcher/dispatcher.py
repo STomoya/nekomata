@@ -7,11 +7,13 @@ import anyio
 
 from nekomata.clients.base import ClientABC
 from nekomata.clients.factory import create_client
+from nekomata.types.clients import PackageSpecificArgs
 from nekomata.types.dispatcher import EndpointConfig
 from nekomata.types.integrations import ChatCompletionResponse, ChatCompletionStatus
 from nekomata.utils import get_logger
 
 ResponseFormatT = TypeVar('ResponseFormatT')
+PackageArgsT = TypeVar('PackageArgsT', bound=PackageSpecificArgs)
 type SamplingParams = dict[str, int | float | str | bool | list[str] | None]
 type Client = ClientABC
 
@@ -143,6 +145,7 @@ class AsyncLLMDispatcher:
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[None]: ...
 
     @overload
@@ -164,6 +167,7 @@ class AsyncLLMDispatcher:
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[ResponseFormatT]: ...
 
     async def submit(
@@ -184,6 +188,7 @@ class AsyncLLMDispatcher:
         extra_body: dict[str, Any] | None = None,
         custom_id: str | None = None,
         max_model_retry: int = 1,
+        args: PackageArgsT | None = None,
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Asynchronously executes an LLM request.
 
@@ -210,6 +215,7 @@ class AsyncLLMDispatcher:
                 Defaults to None.
             max_model_retry (int, optional): Maximum number of retries when failed to validate generated content to
                 pydantic model. Defaults to 1.
+            args (PackageArgsT | None, optional): Package specific arguments. Defaults to None
 
         Returns:
             ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]: Response from the API.
@@ -238,6 +244,7 @@ class AsyncLLMDispatcher:
                 extra_body=extra_body,
                 custom_id=custom_id,
                 max_model_retry=max_model_retry,
+                args=args,
             )
         except anyio.get_cancelled_exc_class():
             logger.warning(f"Request to '{endpoint_name}' was cancelled.")

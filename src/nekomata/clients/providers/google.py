@@ -3,7 +3,7 @@
 from typing import Any, TypeVar, cast
 
 from google.genai import Client, types
-from google.genai._interactions import Omit
+from google.genai._gaos import UNSET
 from google.genai.interactions import GenerationConfig, Interaction, TextContent
 from google.genai.types import GenerateContentResponse
 from pydantic import BaseModel
@@ -200,13 +200,13 @@ class GoogleClient(ClientABC, GoogleBatchAPIPlugin):
 
         # parse json output.
         parsed = None
-        if response_format is not None and issubclass(response_format, BaseModel):
+        if response_format is not None and issubclass(response_format, BaseModel) and content_string:
             parsed = response_format.model_validate_json(content_string)
             parsed = cast(ResponseFormatT, parsed)
 
         # Extract reason summary.
         reason_string = ''
-        for step in response.steps:
+        for step in response.steps:  # ty: ignore[not-iterable]
             if step.type == 'thought':
                 if step.summary is None:
                     continue
@@ -264,7 +264,7 @@ class GoogleClient(ClientABC, GoogleBatchAPIPlugin):
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Google interactions API call."""
         args = args or InteractionsArgs()
-        omit = Omit()
+        omit = UNSET
 
         # NOTE(stomoya): I do not see any top_k and penalty arguments. In addition to these, temperature and top_p are
         #   deprecated, so maybe we might need to eliminate these on future versions.
@@ -291,10 +291,12 @@ class GoogleClient(ClientABC, GoogleBatchAPIPlugin):
             if response_format and issubclass(response_format, BaseModel)
             else omit,
             generation_config=config.model_dump(exclude_none=True),
+            stream=False,
             # The new multi-turn conversation with server-side chat caching.
             store=args.store,
             previous_interaction_id=args.interaction_id or omit,
         )
+        response = cast(Interaction, response)
 
         return self._convert_interactions_output(
             response=response,
