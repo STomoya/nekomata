@@ -1,17 +1,15 @@
-"""Google AI Studio Client.
-
-NOTE(stomoya): Currently, we have no plan to support the vertexai version.
-"""
+"""Google AI Studio Client."""
 
 from typing import Any, TypeVar, cast
 
 from google.genai import Client, types
 from google.genai._gaos import UNSET
-from google.genai.interactions import GenerationConfig, Interaction, TextContent, ThoughtStep
+from google.genai.interactions import GenerationConfig, Interaction, TextContent
 from google.genai.types import GenerateContentResponse
 from pydantic import BaseModel
 
 from nekomata.clients.base import ClientABC
+from nekomata.clients.plugins.google import GoogleBatchAPIPlugin
 from nekomata.types.google import GoogleArgs, InteractionsArgs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger, get_utc_timestamp
@@ -22,7 +20,7 @@ ResponseFormatT = TypeVar('ResponseFormatT')
 logger = get_logger(__name__)
 
 
-class GoogleClient(ClientABC):
+class GoogleClient(ClientABC, GoogleBatchAPIPlugin):
     """Google Cloud Client."""
 
     def __init__(
@@ -208,10 +206,9 @@ class GoogleClient(ClientABC):
 
         # Extract reason summary.
         reason_string = ''
-        if response.steps:
+        if response.steps is not None:
             for step in response.steps:
                 if step.type == 'thought':
-                    step = cast(ThoughtStep, step)
                     if step.summary is None:
                         continue
                     reason_string += ''.join(
