@@ -206,11 +206,14 @@ class GoogleClient(ClientABC, GoogleBatchAPIPlugin):
 
         # Extract reason summary.
         reason_string = ''
-        for step in response.steps:  # ty: ignore[not-iterable]
-            if step.type == 'thought':
-                if step.summary is None:
-                    continue
-                reason_string += ''.join(content.text for content in step.summary if isinstance(content, TextContent))
+        if response.steps is not None:
+            for step in response.steps:
+                if step.type == 'thought':
+                    if step.summary is None:
+                        continue
+                    reason_string += ''.join(
+                        content.text for content in step.summary if isinstance(content, TextContent)
+                    )
         # If thought is empty, return None instead of a empty string.
         if not reason_string.strip():
             reason_string = None
