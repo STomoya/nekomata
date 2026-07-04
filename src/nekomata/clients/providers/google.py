@@ -4,7 +4,7 @@ from typing import Any, TypeVar, cast
 
 from google.genai import Client, types
 from google.genai._interactions import Omit
-from google.genai.interactions import GenerationConfig, Interaction, TextContent, ThoughtStep
+from google.genai.interactions import GenerationConfig, Interaction, TextContent
 from google.genai.types import GenerateContentResponse
 from pydantic import BaseModel
 
@@ -208,7 +208,6 @@ class GoogleClient(ClientABC, GoogleBatchAPIPlugin):
         reason_string = ''
         for step in response.steps:
             if step.type == 'thought':
-                step = cast(ThoughtStep, step)
                 if step.summary is None:
                     continue
                 reason_string += ''.join(content.text for content in step.summary if isinstance(content, TextContent))

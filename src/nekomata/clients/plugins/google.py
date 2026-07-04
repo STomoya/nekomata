@@ -4,8 +4,8 @@ import io
 import json
 from typing import Any, Literal
 
-from google.genai import Client, types
-from pydantic import BaseModel
+from google.genai import Client, _common, types
+from google.genai.batches import _InlinedRequest_to_mldev
 
 from nekomata.clients.base import BatchAPIPlugin
 from nekomata.clients.utils import validate_and_expand_batch_args
@@ -97,16 +97,12 @@ class GoogleBatchAPIPlugin(BatchAPIPlugin):
             logger.info(f"Successfully created Google batch job '{batch_job_name}'.")
             return batch_job
 
-        # File mode (default): format each request as `{"key": custom_id, "request": InlinedRequest}`
-        # and upload via File API
         jsonl_lines = []
-        for idx, req in enumerate(inlined_requests):
-            req_dict = req.model_dump(by_alias=True, exclude_none=True)
-            if 'config' in req_dict and req_dict['config'] and 'responseSchema' in req_dict['config']:
-                schema_val = req_dict['config']['responseSchema']
-                if isinstance(schema_val, type) and issubclass(schema_val, BaseModel):
-                    req_dict['config']['responseSchema'] = schema_val.model_json_schema()
-            jsonl_lines.append(json.dumps({'key': expanded[idx].custom_id, 'request': req_dict}))
+        for req in inlined_requests:
+            req_dict = _InlinedRequest_to_mldev(self._client._api_client, req)
+            req_dict = _common.convert_to_dict(req_dict)
+            req_dict = _common.encode_unserializable_types(req_dict)
+            jsonl_lines.append(json.dumps(req_dict))
 
         file_content = '\n'.join(jsonl_lines) + '\n'
         file_obj = io.BytesIO(file_content.encode('utf-8'))

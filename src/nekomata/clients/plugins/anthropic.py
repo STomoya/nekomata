@@ -1,8 +1,12 @@
 """Anthropic Batch API Client Plugin."""
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from anthropic import AsyncAnthropic
+from anthropic.lib._parse._transform import transform_schema
+from anthropic.types import MessageParam
+from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
+from anthropic.types.messages.batch_create_params import Request
 
 from nekomata.clients.base import BatchAPIPlugin
 from nekomata.clients.utils import filter_none, validate_and_expand_batch_args
@@ -56,11 +60,11 @@ class AnthropicBatchAPIPlugin(BatchAPIPlugin):
 
         logger.info(f"Creating Anthropic batch job with model '{model}' ({len(expanded)} requests)...")
 
-        requests = []
+        requests: list[Request] = []
         for item in expanded:
-            messages = [{'role': 'user', 'content': item.prompt}]
+            messages: list[MessageParam] = [{'role': 'user', 'content': item.prompt}]
 
-            params: dict[str, Any] = {
+            params: MessageCreateParamsNonStreaming = {
                 'model': model,
                 'messages': messages,
                 'max_tokens': item.max_output_tokens if item.max_output_tokens is not None else 4096,
@@ -71,19 +75,27 @@ class AnthropicBatchAPIPlugin(BatchAPIPlugin):
 
             if item.reasoning_effort is not None:
                 params['thinking'] = {'type': 'adaptive', 'display': 'summarized'}
-                params['output_config'] = {'effort': item.reasoning_effort}
+                params['output_config'] = {
+                    'effort': cast(Literal['high', 'low', 'medium', 'max', 'xhigh'], item.reasoning_effort)
+                }
 
             if item.response_format is not None:
-                params['output_format'] = item.response_format
+                schema_dict = transform_schema(item.response_format)
+                output_config = params.get('output_config') or {}
+                output_config['format'] = {
+                    'type': 'json_schema',
+                    'schema': schema_dict,
+                }
+                params['output_config'] = output_config
 
             requests.append(
-                {
-                    'custom_id': item.custom_id,
-                    'params': params,
-                }
+                Request(
+                    custom_id=item.custom_id,
+                    params=params,
+                )
             )
 
-        batch_job = await self._client.beta.messages.batches.create(
+        batch_job = await self._client.messages.batches.create(
             requests=requests,
         )
         batch_job_id = getattr(batch_job, 'id', batch_job)
@@ -94,13 +106,13 @@ class AnthropicBatchAPIPlugin(BatchAPIPlugin):
         """Retrieve the status and details of a batch job."""
         logger.debug(f"Retrieving Anthropic batch job '{batch_id}'...")
         kwargs = filter_none({'timeout': timeout})
-        return await self._client.beta.messages.batches.retrieve(batch_id, **kwargs)
+        return await self._client.messages.batches.retrieve(batch_id, **kwargs)
 
     async def acancel_batch(self, batch_id: str, *, timeout: float | None = None) -> Any:
         """Cancel an active batch job."""
         logger.info(f"Cancelling Anthropic batch job '{batch_id}'...")
         kwargs = filter_none({'timeout': timeout})
-        return await self._client.beta.messages.batches.cancel(batch_id, **kwargs)
+        return await self._client.messages.batches.cancel(batch_id, **kwargs)
 
     async def alist_batches(
         self,
@@ -120,10 +132,10 @@ class AnthropicBatchAPIPlugin(BatchAPIPlugin):
                 'timeout': timeout,
             }
         )
-        return await self._client.beta.messages.batches.list(**kwargs)
+        return await self._client.messages.batches.list(**kwargs)
 
     async def adelete_batch(self, batch_id: str, *, timeout: float | None = None) -> Any:
         """Delete a batch job."""
         logger.info(f"Deleting Anthropic batch job '{batch_id}'...")
         kwargs = filter_none({'timeout': timeout})
-        return await self._client.beta.messages.batches.delete(batch_id, **kwargs)
+        return await self._client.messages.batches.delete(batch_id, **kwargs)

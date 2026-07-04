@@ -34,6 +34,14 @@ def filter_none(kwargs: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in kwargs.items() if v is not None}
 
 
+def _expand_arg[T](arg: T | list[T], length: int) -> list[T]:
+    """Expand a value or list to a given length."""
+    if isinstance(arg, list):
+        return arg
+    output = [arg] * length
+    return output
+
+
 def validate_and_expand_batch_args(
     prompt: str | list[str],
     system_prompt: str | list[str] | None,
@@ -60,51 +68,57 @@ def validate_and_expand_batch_args(
         list[BatchRequestItem]: A list of BatchRequestItem, one for each request in the batch.
 
     """
-    list_args = {}
-    single_args = {}
-    for name, val in [
-        ('prompt', prompt),
-        ('system_prompt', system_prompt),
-        ('max_output_tokens', max_output_tokens),
-        ('response_format', response_format),
-        ('reasoning_effort', reasoning_effort),
-        ('custom_id', custom_id),
-    ]:
-        if isinstance(val, list):
-            list_args[name] = val
-        else:
-            single_args[name] = val
+    list_lengths = {}
+    if isinstance(prompt, list):
+        list_lengths['prompt'] = len(prompt)
+    if isinstance(system_prompt, list):
+        list_lengths['system_prompt'] = len(system_prompt)
+    if isinstance(max_output_tokens, list):
+        list_lengths['max_output_tokens'] = len(max_output_tokens)
+    if isinstance(response_format, list):
+        list_lengths['response_format'] = len(response_format)
+    if isinstance(reasoning_effort, list):
+        list_lengths['reasoning_effort'] = len(reasoning_effort)
+    if isinstance(custom_id, list):
+        list_lengths['custom_id'] = len(custom_id)
 
-    if not list_args:
+    if not list_lengths:
         raise ValueError(
             'At least one of prompt, system_prompt, max_output_tokens, response_format, '
             'reasoning_effort, or custom_id must be a list.'
         )
 
-    lengths = {name: len(val) for name, val in list_args.items()}
-    unique_lengths = set(lengths.values())
+    unique_lengths = set(list_lengths.values())
     if len(unique_lengths) > 1:
-        details = ', '.join(f'{name}: {length}' for name, length in lengths.items())
+        details = ', '.join(f'{name}: {length}' for name, length in list_lengths.items())
         raise ValueError(f'Lengths of list arguments do not match: {details}')
 
     batch_len = next(iter(unique_lengths))
+
+    prompts = _expand_arg(prompt, batch_len)
+    system_prompts = _expand_arg(system_prompt, batch_len)
+    max_tokens_list = _expand_arg(max_output_tokens, batch_len)
+    formats = _expand_arg(response_format, batch_len)
+    reasoning_efforts = _expand_arg(reasoning_effort, batch_len)
+
+    custom_ids: list[str]
+    if isinstance(custom_id, list):
+        custom_ids = custom_id
+    elif custom_id is not None:
+        custom_ids = [f'{custom_id}-{i}' for i in range(batch_len)]
+    else:
+        custom_ids = [f'req-{create_uuid()}' for _ in range(batch_len)]
+
     expanded = []
-
     for i in range(batch_len):
-        item_kwargs = {}
-        for name in ['prompt', 'system_prompt', 'max_output_tokens', 'response_format', 'reasoning_effort']:
-            if name in list_args:
-                item_kwargs[name] = list_args[name][i]
-            else:
-                item_kwargs[name] = single_args[name]
-
-        # Handle custom_id specifically to guarantee uniqueness
-        if 'custom_id' in list_args:
-            item_kwargs['custom_id'] = list_args['custom_id'][i]
-        elif single_args['custom_id'] is not None:
-            item_kwargs['custom_id'] = f'{single_args["custom_id"]}-{i}'
-        else:
-            item_kwargs['custom_id'] = f'req-{create_uuid()}'
-
-        expanded.append(BatchRequestItem(**item_kwargs))
+        expanded.append(
+            BatchRequestItem(
+                prompt=prompts[i],
+                custom_id=custom_ids[i],
+                system_prompt=system_prompts[i],
+                max_output_tokens=max_tokens_list[i],
+                response_format=formats[i],
+                reasoning_effort=reasoning_efforts[i],
+            )
+        )
     return expanded

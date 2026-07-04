@@ -105,5 +105,11 @@ exclude_also = [
     "@(abc\\.)?abstractmethod",
 ]
 
+[tool.ty.src]
+include = [
+    "src",
+    "tests",
+]
+
 [tool.ty.terminal]
 output-format = "concise"
