@@ -46,11 +46,11 @@ class TestAsyncLLMDispatcher:
         assert config.provider == 'openai'
         assert config.base_url == 'http://localhost:8000/v1'
         assert config.api_key == 'local'
-        assert config.max_concurrent == 10  # noqa: PLR2004
-        assert config.max_connections == 10  # noqa: PLR2004
-        assert config.max_keepalive == 10  # noqa: PLR2004
-        assert config.keepalive_expiry == 10  # noqa: PLR2004
-        assert config.timeout == 10  # noqa: PLR2004
+        assert config.max_concurrent == 10
+        assert config.max_connections == 10
+        assert config.max_keepalive == 10
+        assert config.keepalive_expiry == 10
+        assert config.timeout == 10
         assert config.ssl_verify is True
 
     @pytest.mark.anyio
@@ -139,6 +139,7 @@ class TestAsyncLLMDispatcher:
                 extra_body={'chat_template_kwargs': {'enable_thinking': True}},
                 custom_id='id-000',
                 max_model_retry=2,
+                args=None,
             )
 
     @pytest.mark.anyio

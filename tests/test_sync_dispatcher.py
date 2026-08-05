@@ -87,6 +87,46 @@ class TestSyncLLMDispatcher:
             {'chat_template_kwargs': {'enable_thinking': True}},
             'id-000',
             2,
+            None,
+        )
+
+    def test_submit_positional_args(self, mocker) -> None:
+        """Test submitting a request with positional arguments including response_format."""
+        mocker.patch('nekomata.dispatcher.sync.start_blocking_portal')
+        mock_portal = mocker.MagicMock()
+
+        mock_future = concurrent.futures.Future()
+        mock_portal.start_task_soon.return_value = mock_future
+
+        dispatcher = SyncLLMDispatcher()
+        dispatcher._portal = mock_portal
+
+        class MyResponse(BaseModel):
+            answer: str
+
+        # Pass 4 positional arguments: endpoint_name, model, prompt, response_format
+        future = dispatcher.submit('test', 'gpt-4', 'Say hello', MyResponse)
+
+        assert future == mock_future
+        mock_portal.start_task_soon.assert_called_once_with(
+            dispatcher._async_dispatcher.submit,
+            'test',
+            'gpt-4',
+            'Say hello',
+            MyResponse,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            1,
+            None,
         )
 
     def test_submit_not_running(self) -> None:

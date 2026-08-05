@@ -11,7 +11,7 @@ dependencies = [
     "anthropic>=0.100.0",
     "anyio>=4.13.0",
     "fastuuid>=0.14.0",
-    "google-genai>=2.5.0",
+    "google-genai>=2.9.0",
     "httpx>=0.28.1",
     "openai>=2.35.1",
     "pydantic>=2.13.4",
@@ -45,6 +45,7 @@ target-version = "py312"
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403", "F405"]
 "*.pyi" = ["F401"]
+"tests/**/*.py" = ["PLR2004"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -72,6 +73,7 @@ ignore = [
     "PLR0911", # Too many return.
     "PLR0912", # Too many branches.
     "PLR0913", # Too many args.
+    "PLR0917", # Too many positional args.
     "TRY002",  # Create Exception class.
     "TRY003",  # Long message outside exception class.
     "NPY002",  # numpy.random.Generator. Most torch programs use np.random.seed().
@@ -102,6 +104,12 @@ omit = []
 [tool.coverage.report]
 exclude_also = [
     "@(abc\\.)?abstractmethod",
+]
+
+[tool.ty.src]
+include = [
+    "src",
+    "tests",
 ]
 
 [tool.ty.terminal]

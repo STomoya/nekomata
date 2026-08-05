@@ -1,17 +1,15 @@
-"""Google AI Studio Client.
-
-NOTE(stomoya): Currently, we have no plan to support the vertexai version.
-"""
+"""Google AI Studio Client."""
 
 from typing import Any, TypeVar, cast
 
 from google.genai import Client, types
-from google.genai._interactions import Omit
-from google.genai.interactions import GenerationConfig, Interaction, TextContent, ThoughtStep
+from google.genai._gaos import UNSET
+from google.genai.interactions import GenerationConfig, Interaction, TextContent
 from google.genai.types import GenerateContentResponse
 from pydantic import BaseModel
 
 from nekomata.clients.base import ClientABC
+from nekomata.clients.plugins.google import GoogleBatchAPIPlugin
 from nekomata.types.google import GoogleArgs, InteractionsArgs
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.utils import get_logger, get_utc_timestamp
@@ -22,7 +20,7 @@ ResponseFormatT = TypeVar('ResponseFormatT')
 logger = get_logger(__name__)
 
 
-class GoogleClient(ClientABC):
+class GoogleClient(ClientABC, GoogleBatchAPIPlugin):
     """Google Cloud Client."""
 
     def __init__(
@@ -150,7 +148,7 @@ class GoogleClient(ClientABC):
         thinking_config = types.ThinkingConfig(
             include_thoughts=reasoning_effort is not None,
             # NOTE(stomoya): Let the package or API raise the unsupported reasoning_effort value
-            thinking_level=reasoning_effort,  # ty: ignore[invalid-argument-type]
+            thinking_level=reasoning_effort,
         )
         generate_content_config = types.GenerateContentConfig(
             system_instruction=system_prompt,
@@ -202,18 +200,20 @@ class GoogleClient(ClientABC):
 
         # parse json output.
         parsed = None
-        if response_format is not None and issubclass(response_format, BaseModel):
+        if response_format is not None and issubclass(response_format, BaseModel) and content_string:
             parsed = response_format.model_validate_json(content_string)
             parsed = cast(ResponseFormatT, parsed)
 
         # Extract reason summary.
         reason_string = ''
-        for step in response.steps:
-            if step.type == 'thought':
-                step = cast(ThoughtStep, step)
-                if step.summary is None:
-                    continue
-                reason_string += ''.join(content.text for content in step.summary if isinstance(content, TextContent))
+        if response.steps is not None:
+            for step in response.steps:
+                if step.type == 'thought':
+                    if step.summary is None:
+                        continue
+                    reason_string += ''.join(
+                        content.text for content in step.summary if isinstance(content, TextContent)
+                    )
         # If thought is empty, return None instead of a empty string.
         if not reason_string.strip():
             reason_string = None
@@ -267,7 +267,7 @@ class GoogleClient(ClientABC):
     ) -> ChatCompletionResponse[None] | ChatCompletionResponse[ResponseFormatT]:
         """Google interactions API call."""
         args = args or InteractionsArgs()
-        omit = Omit()
+        omit = UNSET
 
         # NOTE(stomoya): I do not see any top_k and penalty arguments. In addition to these, temperature and top_p are
         #   deprecated, so maybe we might need to eliminate these on future versions.
@@ -277,7 +277,7 @@ class GoogleClient(ClientABC):
             temperature=temperature,
             top_p=top_p,
             # NOTE(stomoya): Let the package or API raise the unsupported reasoning_effort value
-            thinking_level=reasoning_effort,  # ty: ignore[invalid-argument-type]
+            thinking_level=reasoning_effort,
         )
 
         response = await self._client.aio.interactions.create(
@@ -294,10 +294,12 @@ class GoogleClient(ClientABC):
             if response_format and issubclass(response_format, BaseModel)
             else omit,
             generation_config=config.model_dump(exclude_none=True),
+            stream=False,
             # The new multi-turn conversation with server-side chat caching.
             store=args.store,
             previous_interaction_id=args.interaction_id or omit,
         )
+        response = cast(Interaction, response)
 
         return self._convert_interactions_output(
             response=response,

@@ -1,6 +1,6 @@
 """OpenAI Client."""
 
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
@@ -8,9 +8,10 @@ from openai.types.chat import (
     ChatCompletionMessageParam,
     ParsedChatCompletion,
 )
-from openai.types.responses import ParsedResponse, Response, ResponseReasoningItem
+from openai.types.responses import ParsedResponse, Response
 
 from nekomata.clients.base import ClientABC
+from nekomata.clients.plugins.openai import OpenAIBatchAPIPlugin
 from nekomata.clients.utils import filter_none
 from nekomata.types.integrations import ChatCompletionResponse
 from nekomata.types.openai import OpenAIArgs, OpenAIChatCompletionCommonAttrs, ResponsesArgs
@@ -22,7 +23,7 @@ ResponseFormatT = TypeVar('ResponseFormatT')
 logger = get_logger(__name__)
 
 
-class OpenAIClient(ClientABC):
+class OpenAIClient(ClientABC, OpenAIBatchAPIPlugin):
     """OpenAI Client."""
 
     def __init__(
@@ -227,7 +228,6 @@ class OpenAIClient(ClientABC):
         reason_string = ''
         for output in response.output:
             if output.type == 'reasoning':
-                output = cast(ResponseReasoningItem, output)
                 reason_string_summary = ''.join(item.text for item in output.summary)
                 if output.content is not None:
                     reason_string_content = ''.join(item.text for item in output.content)
