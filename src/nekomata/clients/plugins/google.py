@@ -68,7 +68,7 @@ class GoogleBatchAPIPlugin(BatchAPIPlugin):
             if item.reasoning_effort is not None:
                 thinking_config = types.ThinkingConfig(
                     include_thoughts=True,
-                    thinking_level=item.reasoning_effort,  # ty: ignore[invalid-argument-type]
+                    thinking_level=item.reasoning_effort,
                 )
 
             config = types.GenerateContentConfig(

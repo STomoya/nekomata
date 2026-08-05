@@ -1,6 +1,6 @@
 """Client registry."""
 
-from typing import Callable, Hashable
+from typing import Callable
 
 from nekomata.clients.base import ClientABC
 from nekomata.const import SUPPORTED_PROVIDERS
@@ -71,8 +71,8 @@ def get_client_entrypoint(name: str) -> type[ClientABC]:
     return CLIENT_REGISTRY.get(name)
 
 
-def list_client_keys() -> list[Hashable]:
+def list_client_keys() -> list[str]:
     """List known client keys."""
     package_keys: list[str] = list(PACKAGE_DEFINED)
-    registry_keys = CLIENT_REGISTRY.list_keys()
+    registry_keys: list[str] = [str(k) for k in CLIENT_REGISTRY.list_keys()]
     return sorted(package_keys + registry_keys)

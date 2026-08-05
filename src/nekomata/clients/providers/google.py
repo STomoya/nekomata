@@ -148,7 +148,7 @@ class GoogleClient(ClientABC, GoogleBatchAPIPlugin):
         thinking_config = types.ThinkingConfig(
             include_thoughts=reasoning_effort is not None,
             # NOTE(stomoya): Let the package or API raise the unsupported reasoning_effort value
-            thinking_level=reasoning_effort,  # ty: ignore[invalid-argument-type]
+            thinking_level=reasoning_effort,
         )
         generate_content_config = types.GenerateContentConfig(
             system_instruction=system_prompt,
@@ -277,7 +277,7 @@ class GoogleClient(ClientABC, GoogleBatchAPIPlugin):
             temperature=temperature,
             top_p=top_p,
             # NOTE(stomoya): Let the package or API raise the unsupported reasoning_effort value
-            thinking_level=reasoning_effort,  # ty: ignore[invalid-argument-type]
+            thinking_level=reasoning_effort,
         )
 
         response = await self._client.aio.interactions.create(

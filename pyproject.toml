@@ -73,6 +73,7 @@ ignore = [
     "PLR0911", # Too many return.
     "PLR0912", # Too many branches.
     "PLR0913", # Too many args.
+    "PLR0917", # Too many positional args.
     "TRY002",  # Create Exception class.
     "TRY003",  # Long message outside exception class.
     "NPY002",  # numpy.random.Generator. Most torch programs use np.random.seed().
